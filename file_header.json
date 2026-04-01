@@ -1,0 +1,13 @@
+{
+    ".osys":{
+        "Public":{
+            "Magic":"OSYS",
+            "Version":0,
+            "DataOffset":0,
+            "ChecksumNum":0
+        },
+        "Private":{
+            "ChecksumID":1
+        }
+    }
+}
