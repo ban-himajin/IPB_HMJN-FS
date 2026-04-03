@@ -140,7 +140,7 @@ int fs_data_format(IPB_HMJN_FS_struct& FS_meta_datas){
 }
 
 template<typename T>
-int write_bitmap_bit(vector<T>&bitmaps, uint64_t bit_num){
+int write_one_bitmap_bit(vector<T>&bitmaps, uint64_t bit_num){
     uint64_t write_bit_index = bit_num/(BYTE * sizeof(T));
     uint8_t write_bit = bit_num%(BYTE * sizeof(T));
     if(bitmaps.size() <= write_bit_index){
@@ -167,14 +167,14 @@ int flash_bitmap_datas(fstream& file,const IPB_HMJN_FS_struct& FS_meta_datas, ve
 
 template<typename T>
 int create_bitmap_data(fstream& file,const IPB_HMJN_FS_struct& FS_meta_datas, vector<T>&bitmaps){
-    if(write_bitmap_bit(bitmaps, 0) != 0)return 1;
+    if(write_one_bitmap_bit(bitmaps, 0) != 0)return 1;
     for(uint64_t count = 0;count < FS_meta_datas.bitmap_size;count++){
-        if(write_bitmap_bit(bitmaps, FS_meta_datas.bitmap_num + count) != 0)return 1;
+        if(write_one_bitmap_bit(bitmaps, FS_meta_datas.bitmap_num + count) != 0)return 1;
     }
-    if(write_bitmap_bit(bitmaps, FS_meta_datas.tree_cluster_num) != 0)return 1;
-    if(write_bitmap_bit(bitmaps, FS_meta_datas.directory_tree_cluster_num) != 0)return 1;
-    if(write_bitmap_bit(bitmaps, FS_meta_datas.free_ID_tree_cluster_num) != 0)return 1;
-    if(write_bitmap_bit(bitmaps, FS_meta_datas.back_up_list_tree_cluster_num) != 0)return 1;
+    if(write_one_bitmap_bit(bitmaps, FS_meta_datas.tree_cluster_num) != 0)return 1;
+    if(write_one_bitmap_bit(bitmaps, FS_meta_datas.directory_tree_cluster_num) != 0)return 1;
+    if(write_one_bitmap_bit(bitmaps, FS_meta_datas.free_ID_tree_cluster_num) != 0)return 1;
+    if(write_one_bitmap_bit(bitmaps, FS_meta_datas.back_up_list_tree_cluster_num) != 0)return 1;
     flash_bitmap_datas(file,FS_meta_datas,bitmaps);
     return 0;
 }
@@ -213,7 +213,7 @@ int write_back_up_super_block(fstream& file, IPB_HMJN_FS_struct FS_meta_datas, u
     if(seek_mode == ios::end)seek_num = FS_meta_datas.partition_cluster_size * one_cluster_bytes - seek_num;
     else if(seek_mode == ios::cur)seek_num = file.tellp();
     write_super_block_data(file, FS_meta_datas, seek_num, ios::beg);
-    write_bitmap_bit(bitmaps, seek_num / one_cluster_bytes);
+    write_one_bitmap_bit(bitmaps, seek_num / one_cluster_bytes);
     return 0;
 }
 
@@ -342,7 +342,6 @@ int data_check_process(const fs::path& vm_disk_path, IPB_HMJN_FS_struct& FS_meta
 //--------------------fs process functions and datas start-------------------
 //この領域はFSの操作にかかわるものを置く領域
 
-//bitmapを正確に確保できたか？のやり取りに使用する構造体
 #pragma pack(push, 1)
 struct free_bitmap_nums{
     uint64_t bitmap_index = 0;
@@ -549,11 +548,6 @@ int mkdir(){
 template<typename T>
 int FS_operation_main(const fs::path& disk_path, IPB_HMJN_FS_struct& FS_meta_data, vector<T>&bitmaps){
     set<free_bit_data_struct> free_bit_data;
-    bitmaps.at(1) |= 1 << 6;
-    free_bit_data.insert({0,2});
-    free_bit_data.insert({1,7});
-    free_bit_data.insert({2,8});
-    free_bit_data.insert({3,8});
     bitmap_result_data get_bitmap_data = get_free_bitmap(bitmaps, 20, free_bit_data);
     if(get_bitmap_data.result_num != 0)return 1;
     cout << "\n------------get bitmap data-----------------" << endl;
