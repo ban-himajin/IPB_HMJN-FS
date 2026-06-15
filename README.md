@@ -61,8 +61,8 @@
 |data_type|0|1byte|0|ファイルのタイプ区別に使用|どの数値が何にあたるのかは後述|
 |ID|1|8byte|0|ディレクトリ構造を構築するうえで使用|-|
 |parent_ID|9|8byte|0|親IDフォルダへ移動するために使用|-|
-|next_sibling_id|17|8byte|右隣の兄弟ID|-|
-|prev_sibling_id|25|8byte|左隣の兄弟ID|-|
+|next_sibling_id|17|8byte|-|-|右隣の兄弟ID|
+|prev_sibling_id|25|8byte|-|-|左隣の兄弟ID|
 |タイプ別要素|-|-|-|-|-|
 |mode|247|8byte|0|読み込み、書き込み、その他もろもろの設定に使用|mode内容後述|
 |last_updatated_time|242|8byte|0|最終更新日時を保存するのに使用|どのように記述するかは後述|
