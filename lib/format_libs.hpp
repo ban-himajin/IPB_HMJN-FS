@@ -638,7 +638,7 @@ namespace IPB_HMJN_FS{
             uint64_t prev_sibling_ID = 0;
             union{
                 struct{
-                    uint8_t pad[199];
+                    uint8_t pad[206];
                 };
                 struct{
                     uint64_t first_child_ID;
@@ -657,10 +657,22 @@ namespace IPB_HMJN_FS{
             uint64_t mode = 0;
             uint64_t last_updata_time = 0;
             uint8_t name_size = 0;
-            uint8_t *name = {0};
-            uint8_t *pad[255] = {0};
+            uint8_t name[256] = {0};
         };
         #pragma pack(pop)
+
+        struct DIR_ENTRY_INTERFACE{
+            DIR_ENTRY &dir_entry;
+            
+            DIR_ENTRY_INTERFACE(DIR_ENTRY &dir_entry_data): dir_entry(dir_entry_data){}
+
+            void set_name(const uint8_t* name_arr){
+                for(uint64_t i = 0; i < this->dir_entry.name_size && i < 256; i++){
+                    std::cout << "test : " << i << std::endl;
+                    this->dir_entry.name[i] = name_arr[i];
+                }
+            }
+        };
     }
 
     namespace EXECUTION{
@@ -670,44 +682,133 @@ namespace IPB_HMJN_FS{
         };
 
         namespace BIT_MAP_FUNCTIONS{
+            using namespace std;
+
+            const uint64_t bitmap_bit_size = 3;
 
             struct BITMAP_DATA_STRUCT{
-                static uint64_t bitsize;//乗数を入れる
+                uint64_t bitsize;//乗数を入れる
                 uint64_t bits = 0;
                 uint8_t free_count = 0;
+            };
+
+            struct SELECT_BITMAP_DATA{
+                uint64_t select_size = 0;
+                uint64_t start_index = 0;
+                uint64_t start_offset = 0;
             };
 
             struct BIT_MAP_FUNCTION: virtual public GET_DATA_METHOD_STRUCT{
                 
                 vector<uint8_t> bitmap;
                 vector<BITMAP_DATA_STRUCT> bitmap_data;
-                
-                
+
                 // // 戻り値として論理アドレス位置を返すようにしたい
                 // // 断片化したときのことも考えてプログラムを組む必要がある
                 // bitmapを配列として(型はBITMAP_DATA_STRUCT)
-                void set_bitmap_datas(){
+                vector<BITMAP_DATA_STRUCT> set_bitmap_datas(){
+                    vector<BITMAP_DATA_STRUCT> bitmaps;
+                    bitmaps.resize(this->bitmap.size());
                     uint64_t zero_count = 0;
                     uint64_t bit_shift_count = 0;
+                    uint64_t one_scan_bit_num = __builtin_popcount(~0);
                     BITMAP_DATA_STRUCT bitmap_struct_data;
                     for(int index = 0; index < this->bitmap.size(); index++){
+                        bitmap_struct_data.bitsize = bitmap_bit_size;
+                        uint64_t one_bitmap_bit_size = 1 << bitmap_struct_data.bitsize;
                         uint8_t zero_count = __builtin_popcount(~bitmap.at(index));
-                        bitmap_struct_data.free_count = zero_count;
+                        bitmap_struct_data.free_count = one_bitmap_bit_size - (one_scan_bit_num - zero_count);
                         bitmap_struct_data.bits = bitmap.at(index);
-                        this->bitmap_data.push_back(bitmap_struct_data);
+                        bitmaps.at(index) = bitmap_struct_data;
+                        #if OUTPUT_BITMAP_DATA_LOG == 1
+                            cout << "----------bitmap data struct log---------" << endl;
+                            cout << "index num : " << index << endl;
+                            cout << "bitsize : " << bitmaps.at(index).bitsize << endl;
+                            cout << "bits : " << static_cast<uint64_t>(bitmaps.at(index).bits) << endl;
+                            cout << "real bits : " << bitset<sizeof(uint64_t)>(bitmap.at(index)) << endl;
+                            cout << "free count : " << static_cast<uint64_t>(bitmaps.at(index).free_count) << endl;
+                            cout << "-------------------------------------------" << endl;
+                        #endif
                     }
+                    return bitmaps;
                 }
 
                 BIT_MAP_FUNCTION(PARTITION_HEADER &header_data, fstream &file): GET_DATA_METHOD_STRUCT(header_data)
                 , FS_STANDARD_STRUCT(header_data){
-                    bitmap.resize((this->header_data.partition_cluster_size - ((sizeof(uint8_t) * 8) - 1)) / (sizeof(uint8_t) * 8), 0);
+                    bitmap.resize((this->header_data.partition_cluster_size - ((sizeof(uint8_t) * 8) - 1)) / (sizeof(uint8_t) * 8) + 1, 0);
                     file.seekg(this->header_data.bitmap_cluster_num * this->get_one_cluster_bytes(), ios::beg);
-                    file.read(reinterpret_cast<char*>(bitmap.data()), bitmap.size());
-                    set_bitmap_datas();
+                    file.read(reinterpret_cast<char*>(bitmap.data()), bitmap.size() * sizeof(uint8_t));
+                    #if OUTPUT_BITMAP_DATA_LOG == 1
+                    for(const auto& bits : bitmap){
+                        cout << "real bits : " << bitset<sizeof(uint8_t) * 8>(bits) << endl;
+                    }
+                    #endif
+                    bitmap_data = set_bitmap_datas();
                 }
 
-                
+                SELECT_BITMAP_DATA get_bitmap_data(uint64_t select_size){
+                    const uint64_t one_bit_size = 1 << bitmap_data.at(0).bitsize;
+                    uint64_t zero_count = 0;
+                    uint64_t start_index = 0;
+                    uint64_t start_offset = 0;
+                    uint64_t one_bitmap_bit_size = 1 << bitmap_bit_size;
+                    uint64_t one_scan_bit_num = __builtin_ctzll(0ULL);
+                    SELECT_BITMAP_DATA result_bitmap_data;
+                    for(int index = 0; index < bitmap_data.size(); index++){
+                        if(bitmap_data.at(index).free_count >= select_size || one_bit_size <= select_size){
+                            //ビットマップを実際に比較をする
 
+                            //bit反転をしているため空いている場所が0ではなく1として扱われるようになる
+                            uint64_t bits = ~bitmap_data.at(index).bits;
+                            for(uint64_t scan_count = 0; scan_count < one_bit_size;scan_count++){
+
+                                uint64_t shift_size = 0;
+
+                                //bitmapの調べる位置が埋まっていた場合の処理
+                                if((bits & 1) == 0){
+                                    zero_count = 0;
+
+                                    //bitmapがすべて探索されたときの処理
+                                    if(bits == 0){
+                                        start_offset = 0;
+                                        start_index = index;
+                                        break;
+                                    }
+
+                                    shift_size = __builtin_ctzll(bits);
+                                    // bits >> shift_size;
+                                    start_offset = scan_count + shift_size;
+
+                                }
+
+                                //bitmapの調べる位置が開いていた場合の処理
+                                else{
+                                    shift_size = one_bitmap_bit_size - (one_scan_bit_num - __builtin_ctzll(~bits));
+                                    zero_count += shift_size;
+                                    // bits >> shift_size;
+                                }
+                                bits = bits >> shift_size;
+                                scan_count += shift_size;
+                            }
+
+                            //欲しい空き容量が見つかった場合の処理
+                            if(zero_count >= select_size){
+                                result_bitmap_data.select_size = select_size;
+                                result_bitmap_data.start_index = start_index;
+                                result_bitmap_data.start_offset = start_offset;
+                                #if OUTPUT_BITMAP_DATA_LOG == 1
+                                cout << "----------get bitmap data---------" << endl;
+                                cout << "select size : " << result_bitmap_data.select_size << endl;
+                                cout << "start index : " << result_bitmap_data.start_index << endl;
+                                cout << "start offset : " << result_bitmap_data.start_offset << endl;
+                                cout << "----------------------------------" << endl;
+                                #endif
+                                break;
+                            }
+                        }
+                    }
+                    return result_bitmap_data;
+                }
             };
         }
 
@@ -715,9 +816,10 @@ namespace IPB_HMJN_FS{
             struct TREE_FUNCTION: virtual public GET_DATA_METHOD_STRUCT{
                 TREE_FUNCTION(PARTITION_HEADER &header_data): GET_DATA_METHOD_STRUCT(header_data)
                 , FS_STANDARD_STRUCT(header_data){}
-                uint64_t reload_tree(uint64_t top_cluster_num){
+                // ツリーを更新する関数
+                // uint64_t reload_tree(uint64_t top_cluster_num){
 
-                }
+                // }
 
             };
         }        
@@ -857,9 +959,11 @@ namespace IPB_HMJN_FS{
                     }
                     else{
                         result_data.offset_byte = ID % (this->get_one_cluster_bytes() / sizeof(FS_TYPES::DIR_ENTRY)) * sizeof(FS_TYPES::DIR_ENTRY);  //--------------------------------------------ワンちゃん512の切り上げでやったほうがいいかも？
+                        #if OUTPUT_DIRECTORY_TREE_LOG == 1
                         cout << "size : " << sizeof(FS_TYPES::DIR_ENTRY) << endl;
                         cout << "offset : " << this->get_one_cluster_bytes() / sizeof(FS_TYPES::DIR_ENTRY) << endl;
                         cout << "result_data.offset_byte : " << result_data.offset_byte << endl;
+                        #endif
                         result_data.cluster_address = this->header_data.directory_tree_cluster_num;
                     }
                     #if OUTPUT_DIRECTORY_TREE_LOG == 1
