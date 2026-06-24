@@ -828,42 +828,43 @@ namespace IPB_HMJN_FS{
                 RELOAD_STRUCT write_bit_flag(SELECT_BITMAP_DATA select_data){
                     vector<SELECT_BITMAP_DATA>reload_log;
                     uint64_t flag_bit = ((1 << select_data.select_size) - 1) << select_data.start_offset;
-                    cout << "test log1 : " << flag_bit << endl;
                     uint64_t scan_bit_size = 1 << bitmap_data.at(0).bitsize;
-                    //うまく指定したbit数を得られていないため原因がここではないか？と考えている
-                    //↓----------------------------------------------------------------------------------------------------多分ここが原因
-                    // uint64_t loop_num = (select_data.start_offset + (scan_bit_size - 1)) / scan_bit_size;
                     uint64_t loop_num = (select_data.select_size + (scan_bit_size - 1)) / scan_bit_size;
+                    uint64_t write_bit_nums = 0;
+                    uint64_t reload_index_num = 0;
+                    uint64_t count = 1;
+                    #if OUTPUT_BITMAP_DATA_LOG == 1
+                    cout << "----------write bit flag----------" << endl;
+                    #endif
+                    0;
+                    uint64_t bits = bitmap_data.at(select_data.start_index).bits;
+                    cout << "test bits1 : " << bitset<8>(bits) << endl;
+                    bits |= (1 << (1 << bitmap_data.at(select_data.start_index).bitsize) - select_data.start_offset) - 1 << __builtin_ctzll(~bits);
+                    bitmap_data.at(select_data.start_index).bits = bits;
+                    bitmap_data.at(select_data.start_index).free_count = __builtin_ctzll(bits);
+                    bitmap.at(select_data.start_index) = bits;
+                    write_bit_nums += (1 << bitmap_data.at(select_data.start_index).bitsize) - select_data.start_offset;
+                    
+                    for(count = 1; (write_bit_nums + (1 << bitmap_data.at(select_data.start_index + count).bitsize)) < select_data.select_size; count++){
+                        uint64_t bits = bitmap_data.at(select_data.start_index + count).bits;
+                        bits |= (1 << (1 << bitmap_data.at(select_data.start_index + count).bitsize)) - 1 << __builtin_ctzll(~bits);
+                        bitmap_data.at(select_data.start_index + count).bits = bits;
+                        bitmap_data.at(select_data.start_index + count).free_count = __builtin_ctzll(bits);
+                        bitmap.at(select_data.start_index + count) = bits;
+                        write_bit_nums += (1 << bitmap_data.at(select_data.start_index + count).bitsize);
+                        cout << "count : " << count << endl;
+                    }
+                    
+                    bits = bitmap_data.at(select_data.start_index + count).bits;
+                    bits |= ((1 << (select_data.select_size - write_bit_nums)) - 1) << __builtin_ctzll(~bits);
+                    bitmap_data.at(select_data.start_index + count).bits = bits;
+                    bitmap_data.at(select_data.start_index + count).free_count = __builtin_ctzll(bits);
+                    bitmap.at(select_data.start_index + count) = bits;
+                    cout << "test log1 : " << bitset<8>(bits) << endl;
+                    cout << "write_bit_nums : " << write_bit_nums << endl;
                     RELOAD_STRUCT data_log;
                     data_log.start_index = select_data.start_index;
                     data_log.reload_index_num = loop_num;
-                    #if OUTPUT_BITMAP_DATA_LOG == 1
-                    cout << "----------write bit flag----------" << endl;
-                    cout << "write bit nums : " << __builtin_popcount(flag_bit) << endl;
-                    cout << "scan bit size : " << scan_bit_size << endl;
-                    cout << "loop num : " << loop_num << endl;
-                    #endif
-                    
-                    for(uint64_t index = 0; index < loop_num; index++){
-                        #if OUTPUT_BITMAP_DATA_LOG == 1
-                        cout << "index : " << index << endl;
-                        cout << "write bit : " << bitset<1 << 3>(flag_bit) << endl;
-                        cout << "before bit : " << bitset<1 << 3>(bitmap.at(select_data.start_index + index)) << endl;
-                        #endif
-                        uint64_t one_bitmap_bit_size = 1 << bitmap_data.at(0).bitsize;
-                        uint64_t one_scan_bit_num = __builtin_popcount(~0);
-                        bitmap.at(select_data.start_index + index) |= flag_bit;
-                        bitmap_data.at(select_data.start_index + index).bits = bitmap.at(select_data.start_index + index);
-                        bitmap_data.at(select_data.start_index + index).free_count = one_bitmap_bit_size - (one_scan_bit_num - __builtin_popcount(~bitmap.at(select_data.start_index + index)));
-                        #if OUTPUT_BITMAP_DATA_LOG == 1
-                        cout << "after bit : " << bitset<1 << 3>(bitmap.at(select_data.start_index + index)) << endl;
-                        cout << "~~~~~reload datas~~~~~" << endl;
-                        cout << "bits : " << bitset<sizeof(uint8_t) * 8>(bitmap_data.at(select_data.start_index + index).bits) << endl;
-                        cout << "flee count : " << static_cast<uint64_t>(bitmap_data.at(select_data.start_index + index).free_count) << endl;
-                        cout << "~~~~~~~~~~~~~~~~~~~~~~" << endl;
-                        #endif
-                        flag_bit = flag_bit >> scan_bit_size;
-                    }
                     #if OUTPUT_BITMAP_DATA_LOG == 1
                     cout << "----------------------------------" << endl;
                     #endif
