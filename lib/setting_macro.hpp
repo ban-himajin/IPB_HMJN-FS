@@ -18,12 +18,13 @@
 
     #define OUTPUT_DEBUG_LOGS 1
     #if OUTPUT_DEBUG_LOGS == 1
-        #define OUTPUT_SETTING_DATA_LOG 0
+        #define OUTPUT_SETTING_DATA_LOG 1
         #define OUTPUT_FORMAT_LOG 0
         #define OUTPUT_EXECUTION_LOG 1
         #if OUTPUT_EXECUTION_LOG == 1
             #define OUTPUT_DIRECTORY_TREE_LOG 1
             #define OUTPUT_BITMAP_DATA_LOG 1
+            #define OUTPUT_TREE_DATA_LOG 1
 
 
         #endif

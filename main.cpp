@@ -28,6 +28,8 @@ int main(){
     cout << "get ID : " << dir_ID.dir_tree_cluster << endl;
     directory.write_directory_data(dir_entry, file);
     directory.write_directory_data(dir_entry, file);
-    IPB_HMJN_FS::EXECUTION::BIT_MAP_FUNCTIONS::BIT_MAP_FUNCTION bitmap_exe(fs_header, file);
-    IPB_HMJN_FS::EXECUTION::BIT_MAP_FUNCTIONS::SELECT_BITMAP_DATA test = bitmap_exe.get_bitmap_data(10);
+    IPB_HMJN_FS::EXECUTION::BIT_MAP_FUNCTIONS::BIT_MAP_FUNCTION bitmap_exe(fs_header);
+    IPB_HMJN_FS::EXECUTION::BIT_MAP_FUNCTIONS::SELECT_BITMAP_DATA test1 = bitmap_exe.get_bitmap_data(10);
+    IPB_HMJN_FS::EXECUTION::BIT_MAP_FUNCTIONS::RELOAD_STRUCT test2 = bitmap_exe.write_bit_flag(test1);
+    bitmap_exe.reload_bitmap(test2, file);
 }

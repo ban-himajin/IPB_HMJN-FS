@@ -626,6 +626,8 @@ namespace IPB_HMJN_FS{
             dir = 0,
             file = 1,
             simbolic = 2,
+            socket = 3,
+            division = 4,
         };
 
         
@@ -638,7 +640,7 @@ namespace IPB_HMJN_FS{
             uint64_t prev_sibling_ID = 0;
             union{
                 struct{
-                    uint8_t pad[206];
+                    uint8_t pad[206] = {0};
                 };
                 struct{
                     uint64_t first_child_ID;
@@ -653,6 +655,11 @@ namespace IPB_HMJN_FS{
                 struct{
                     uint64_t target_ID;
                 }simbolic;
+                struct{
+                    uint64_t bit_flag;
+                    uint64_t block_address;
+                    uint64_t secter_address;
+                }division;
             }another_type_data;
             uint64_t mode = 0;
             uint64_t last_updata_time = 0;
@@ -698,6 +705,11 @@ namespace IPB_HMJN_FS{
                 uint64_t start_offset = 0;
             };
 
+            struct RELOAD_STRUCT{
+                uint64_t start_index = 0;
+                uint64_t reload_index_num = 0;
+            };
+
             struct BIT_MAP_FUNCTION: virtual public GET_DATA_METHOD_STRUCT{
                 
                 vector<uint8_t> bitmap;
@@ -733,8 +745,9 @@ namespace IPB_HMJN_FS{
                     return bitmaps;
                 }
 
-                BIT_MAP_FUNCTION(PARTITION_HEADER &header_data, fstream &file): GET_DATA_METHOD_STRUCT(header_data)
+                BIT_MAP_FUNCTION(PARTITION_HEADER &header_data): GET_DATA_METHOD_STRUCT(header_data)
                 , FS_STANDARD_STRUCT(header_data){
+                    fstream file(IPB_HMJN_FS::output_filename, ios::in | ios::out | ios::binary);
                     bitmap.resize((this->header_data.partition_cluster_size - ((sizeof(uint8_t) * 8) - 1)) / (sizeof(uint8_t) * 8) + 1, 0);
                     file.seekg(this->header_data.bitmap_cluster_num * this->get_one_cluster_bytes(), ios::beg);
                     file.read(reinterpret_cast<char*>(bitmap.data()), bitmap.size() * sizeof(uint8_t));
@@ -746,6 +759,8 @@ namespace IPB_HMJN_FS{
                     bitmap_data = set_bitmap_datas();
                 }
 
+                //連続した空き位置をビットマップから探す
+                //断片化を前提の空き探索は未実装
                 SELECT_BITMAP_DATA get_bitmap_data(uint64_t select_size){
                     const uint64_t one_bit_size = 1 << bitmap_data.at(0).bitsize;
                     uint64_t zero_count = 0;
@@ -809,20 +824,174 @@ namespace IPB_HMJN_FS{
                     }
                     return result_bitmap_data;
                 }
+
+                RELOAD_STRUCT write_bit_flag(SELECT_BITMAP_DATA select_data){
+                    vector<SELECT_BITMAP_DATA>reload_log;
+                    uint64_t flag_bit = ((1 << select_data.select_size) - 1) << select_data.start_offset;
+                    cout << "test log1 : " << flag_bit << endl;
+                    uint64_t scan_bit_size = 1 << bitmap_data.at(0).bitsize;
+                    //うまく指定したbit数を得られていないため原因がここではないか？と考えている
+                    //↓----------------------------------------------------------------------------------------------------多分ここが原因
+                    // uint64_t loop_num = (select_data.start_offset + (scan_bit_size - 1)) / scan_bit_size;
+                    uint64_t loop_num = (select_data.select_size + (scan_bit_size - 1)) / scan_bit_size;
+                    RELOAD_STRUCT data_log;
+                    data_log.start_index = select_data.start_index;
+                    data_log.reload_index_num = loop_num;
+                    #if OUTPUT_BITMAP_DATA_LOG == 1
+                    cout << "----------write bit flag----------" << endl;
+                    cout << "write bit nums : " << __builtin_popcount(flag_bit) << endl;
+                    cout << "scan bit size : " << scan_bit_size << endl;
+                    cout << "loop num : " << loop_num << endl;
+                    #endif
+                    
+                    for(uint64_t index = 0; index < loop_num; index++){
+                        #if OUTPUT_BITMAP_DATA_LOG == 1
+                        cout << "index : " << index << endl;
+                        cout << "write bit : " << bitset<1 << 3>(flag_bit) << endl;
+                        cout << "before bit : " << bitset<1 << 3>(bitmap.at(select_data.start_index + index)) << endl;
+                        #endif
+                        uint64_t one_bitmap_bit_size = 1 << bitmap_data.at(0).bitsize;
+                        uint64_t one_scan_bit_num = __builtin_popcount(~0);
+                        bitmap.at(select_data.start_index + index) |= flag_bit;
+                        bitmap_data.at(select_data.start_index + index).bits = bitmap.at(select_data.start_index + index);
+                        bitmap_data.at(select_data.start_index + index).free_count = one_bitmap_bit_size - (one_scan_bit_num - __builtin_popcount(~bitmap.at(select_data.start_index + index)));
+                        #if OUTPUT_BITMAP_DATA_LOG == 1
+                        cout << "after bit : " << bitset<1 << 3>(bitmap.at(select_data.start_index + index)) << endl;
+                        cout << "~~~~~reload datas~~~~~" << endl;
+                        cout << "bits : " << bitset<sizeof(uint8_t) * 8>(bitmap_data.at(select_data.start_index + index).bits) << endl;
+                        cout << "flee count : " << static_cast<uint64_t>(bitmap_data.at(select_data.start_index + index).free_count) << endl;
+                        cout << "~~~~~~~~~~~~~~~~~~~~~~" << endl;
+                        #endif
+                        flag_bit = flag_bit >> scan_bit_size;
+                    }
+                    #if OUTPUT_BITMAP_DATA_LOG == 1
+                    cout << "----------------------------------" << endl;
+                    #endif
+                    return data_log;
+                }
+
+                // void reload_bitmap(RELOAD_STRUCT reload_data, fstream& file = fstream(output_filename, ios::beg)){
+                void reload_bitmap(RELOAD_STRUCT reload_data, fstream& file){
+                    file.seekp((this->header_data.bitmap_cluster_num * this->get_one_cluster_bytes()) + ((1 << bitmap_data.at(0).bitsize) * reload_data.start_index), ios::beg);
+                    file.write(reinterpret_cast<char *>(bitmap.data() + ((sizeof(uint8_t) * 8) * reload_data.start_index)), ((sizeof(uint8_t) * 8) / (1 << bitmap_data.at(0).bitsize)) * (reload_data.reload_index_num + 1));
+                    #if OUTPUT_BITMAP_DATA_LOG == 1
+                    cout << "----------reload bitmap----------" << endl;
+                    cout << "seek size : " << (this->header_data.bitmap_cluster_num * this->get_one_cluster_bytes()) + ((1 << bitmap_data.at(0).bitsize) * reload_data.start_index) << endl;
+                    cout << "write data : " << ((sizeof(uint8_t) * 8) * reload_data.start_index) << endl;
+                    cout << "write byte num : " << ((sizeof(uint8_t) * 8) / (1 << bitmap_data.at(0).bitsize)) * (reload_data.reload_index_num + 1) << endl;
+                    cout << "---------------------------------" << endl;
+                    #endif
+                }
+
+                RELOAD_STRUCT delete_bit_flag(SELECT_BITMAP_DATA select_data){
+                    const uint64_t one_bitmap_bit_size = 1 << BIT_MAP_FUNCTIONS::bitmap_bit_size;
+                    // const uint64_t loop_num = (select_data.start_index + (one_bitmap_bit_size - 1)) / one_bitmap_bit_size;
+                    // const uint64_t loop_num = (select_data.start_offset + (one_bitmap_bit_size - 1)) / one_bitmap_bit_size;
+                    const uint64_t loop_num = (select_data.select_size  + (one_bitmap_bit_size - 1)) / one_bitmap_bit_size;
+                    // const uint64_t loop_num = select_data.start_index/ one_bitmap_bit_size;
+                    cout << "test log1 : " << select_data.select_size << endl;
+                    cout << "test log2 : " << select_data.select_size + (one_bitmap_bit_size - 1) << endl;
+                    cout << "test log3 : " << (select_data.select_size + (one_bitmap_bit_size - 1)) / one_bitmap_bit_size << endl;
+                    uint64_t bit_shift_num = 0;
+                    bit_shift_num = 0;
+                    uint8_t bits = ~bitmap_data.at(select_data.start_index).bits;
+                    uint64_t delete_bit_num = 0;
+                    // bits |= ((1 << select_data.select_size) >> select_data.start_offset) - 1;
+
+                    // bits |= (1 << (select_data.start_offset)) - 1;
+                    bits |= ((1 << ((1 << bitmap_data.at(select_data.start_index).bitsize) - select_data.start_offset)) - 1) << select_data.start_offset;
+                    delete_bit_num += (1 << bitmap_data.at(select_data.start_index).bitsize) - select_data.start_offset;
+
+                    bitmap_data.at(select_data.start_index).bits = ~bits;
+                    bitmap_data.at(select_data.start_index).free_count = __builtin_popcount(~bits);
+                    bitmap.at(select_data.start_index) = ~bits;
+                    
+                    #if OUTPUT_BITMAP_DATA_LOG == 1
+                    std::cout << "----------delete bit flag----------" << std::endl;
+                    std::cout << "select_size : " << select_data.select_size << std::endl;
+                    std::cout << "start_index : " << select_data.start_index << std::endl;
+                    std::cout << "start_offset : " << select_data.start_offset << std::endl;
+                    std::cout << "loop num : " << loop_num << std::endl;
+                    std::cout << "delete bit num : " << delete_bit_num << std::endl;
+                    #endif
+                    for(uint64_t i = 1; i < loop_num; i++){
+                        bits = ~bitmap_data.at(select_data.start_index + i).bits;
+                        // bits |= ((1 << select_data.select_size)) - 1;
+                        // bits |= (1 << (1 << bitmap_data.at(select_data.start_index + i).bitsize)) - 1;
+                        bits |= (1 << (1 << bitmap_data.at(select_data.start_index + i).bitsize)) - 1;
+                        delete_bit_num += (1 << bitmap_data.at(select_data.start_index + i).bitsize);
+                        
+                        bitmap_data.at(select_data.start_index + i).bits = ~bits;
+                        bitmap_data.at(select_data.start_index + i).free_count = __builtin_popcount(~bits);
+                        bitmap.at(select_data.start_index + i) = ~bits;
+                        #if OUTPUT_BITMAP_DATA_LOG == 1
+                        
+                        std::cout << "~~~~~~~~~~index : " << select_data.start_index + i << "~~~~~~~~~~" << endl;
+                        std::cout << "delete bit num : " << delete_bit_num << std::endl;
+                        std::cout << "real bit log : " <<  bitset<8>(~bits) << std::endl;
+                        std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << endl;
+                        #endif
+                    }
+                    bits = ~bitmap_data.at(select_data.start_index + loop_num).bits;
+
+                    // bits |= (1 << (select_data.select_size - delete_bit_num)) - 1;
+                    bits |= (((1 << bitmap_data.at(select_data.start_index + loop_num).bitsize) - 1) << (bitmap_data.at(select_data.start_index + loop_num).bitsize) - select_data.select_size - delete_bit_num) - 1;
+                    delete_bit_num += (select_data.select_size - delete_bit_num);
+                    bitmap_data.at(select_data.start_index + loop_num).bits = ~bits;
+                    bitmap_data.at(select_data.start_index + loop_num).free_count = __builtin_popcount(~bits);
+                    bitmap.at(select_data.start_index + loop_num) = ~bits;
+                    RELOAD_STRUCT reload_data;
+                    reload_data.start_index = select_data.start_index;
+                    reload_data.reload_index_num = loop_num + 1;
+                    // reload_bitmap(reload_data);
+                    #if OUTPUT_BITMAP_DATA_LOG == 1
+                    std::cout << "real bit log : " <<  bitset<8>(~bits) << std::endl;
+                    std::cout << "delete bit num : " << delete_bit_num << std::endl;
+                    std::cout << "-----------------------------------" << std::endl;
+                    #endif
+                    return reload_data;
+                }
+
+                uint64_t cast_address(SELECT_BITMAP_DATA result_data){
+                    uint64_t one_bitmap_bit_size = 1 << bitmap_bit_size;
+                    uint64_t select_address = (result_data.start_index * one_bitmap_bit_size) + result_data.start_offset;
+                    return select_address;
+                }
+            
             };
         }
 
         namespace TREE_FUNCTIONS{
-            struct TREE_FUNCTION: virtual public GET_DATA_METHOD_STRUCT{
-                TREE_FUNCTION(PARTITION_HEADER &header_data): GET_DATA_METHOD_STRUCT(header_data)
-                , FS_STANDARD_STRUCT(header_data){}
-                // ツリーを更新する関数
-                // uint64_t reload_tree(uint64_t top_cluster_num){
+            using namespace std;
 
-                // }
+            struct TREE_FUNCTION: virtual public GET_DATA_METHOD_STRUCT
+            , virtual public BIT_MAP_FUNCTIONS::BIT_MAP_FUNCTION{
+
+                TREE_FUNCTION(PARTITION_HEADER &header_data): GET_DATA_METHOD_STRUCT(header_data)
+                , FS_STANDARD_STRUCT(header_data)
+                , BIT_MAP_FUNCTIONS::BIT_MAP_FUNCTION(header_data){}
+                // ツリーを更新する関数
+                // どのツリーを更新したか？というのは知らないためスーパーブロックの更新は別で作る必要がある
+                uint64_t reload_tree(uint64_t top_cluster_num, fstream &file){
+                    uint64_t write_address_num = this->cast_address(this->get_bitmap_data(1));
+                    uint64_t one_bitmap_bit_size = 1 << BIT_MAP_FUNCTIONS::bitmap_bit_size;
+                    file.seekp(write_address_num * this->get_one_cluster_bytes(), ios::beg);
+                    file.write(reinterpret_cast<char*>(top_cluster_num), sizeof(uint64_t) * 8);
+                    #if OUTPUT_TREE_DATA_LOG == 1
+                    std::cout << "----------tree function----------" << std::endl;
+                    std::cout << "write address num : " << write_address_num << std::endl;
+                    std::cout << "---------------------------------" << std::endl;
+                    #endif
+                    return write_address_num;
+                }
+
+                uint64_t delete_tree(){
+
+                    return 0;
+                }
 
             };
-        }        
+        }
 
         namespace DIRECTORY_TREE{
             using namespace std;
@@ -907,31 +1076,7 @@ namespace IPB_HMJN_FS{
                 }
 
                 //IDを書くべき場所のアドレスを得る
-                // uint64_t get_write_address(const uint64_t ID, fstream &file, const uint64_t arr_num, uint64_t now_deep = 0){
                 WRITE_ENTRY_DATA get_write_address(const uint64_t ID, fstream &file, const uint64_t tree_deep, uint64_t now_deep = 0){
-                    // #if OUTPUT_DIRECTORY_TREE_LOG == 1
-                    // cout << "----------get write address----------" << endl;
-                    // cout << "now tree deep : " << now_deep << endl;
-                    // cout << "directory tree deep : " << this->header_data.directory_tree_depth << endl;
-                    // cout << now_deep << " < " << (this->header_data.directory_tree_depth+1) << endl;
-                    // cout << "true or false : " << (now_deep < (this->header_data.directory_tree_depth+1)) << endl;
-                    // #endif
-                    // // return 0;
-                    // if(now_deep < this->header_data.directory_tree_depth){
-                    //     uint64_t address = get_write_address(ID, file, arr_num / (this->get_one_cluster_bytes() / sizeof(uint64_t)), now_deep + 1);
-                    //     uint64_t access_ID = arr_num % (this->get_one_cluster_bytes() / sizeof(uint64_t));
-                    //     uint64_t buffer[64];
-                    //     file.seekg(address * this->get_one_cluster_bytes(), ios::beg);
-                    //     file.read(reinterpret_cast<char*>(buffer), 512);
-                    //     #if OUTPUT_DIRECTORY_TREE_LOG == 1
-                    //     cout << "seek size : " << address * this->get_one_cluster_bytes() << endl;
-                    //     cout << "result sddress : " << buffer[access_ID] << endl;
-                    //     cout << "-------------------------------------" << endl;
-                    //     #endif
-                    //     return buffer[access_ID];
-                    // }
-                    // return this->header_data.directory_tree_cluster_num;
-
                    uint64_t access_num = ID / (sizeof(uint64_t) * 8);
                    uint64_t next_num = ID % (sizeof(uint64_t) * 8);
                    #if OUTPUT_DIRECTORY_TREE_LOG == 1
@@ -954,7 +1099,8 @@ namespace IPB_HMJN_FS{
                     else if(now_deep == tree_deep){
                         uint64_t one_cluster_entry_num = this->get_one_cluster_bytes() / sizeof(FS_TYPES::DIR_ENTRY);
                         if(one_cluster_entry_num > 1){
-
+                            //1クラスタに対するエントリ数が1ではなかったときの処理(1クラスタ内まで探索する処理を書く場所)
+                            scan_directory_entry();
                         }
                     }
                     else{
@@ -1072,9 +1218,6 @@ namespace IPB_HMJN_FS{
 
         };
 
-        void test(PARTITION_HEADER &t){
-            EXECUTION_STRUCT exe(t);
-        }
     }
 
 
