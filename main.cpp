@@ -28,10 +28,21 @@ int main(){
     cout << "get ID : " << dir_ID.dir_tree_cluster << endl;
     // directory.write_directory_data(dir_entry, file);
     // directory.write_directory_data(dir_entry, file);
-    IPB_HMJN_FS::EXECUTION::BIT_MAP_FUNCTIONS::BIT_MAP_FUNCTION bitmap_exe(fs_header);
+    // IPB_HMJN_FS::EXECUTION::BIT_MAP_FUNCTIONS::BIT_MAP_FUNCTION bitmap_exe(fs_header);
+    IPB_HMJN_FS::EXECUTION::TREE_FUNCTIONS::TREE_FUNCTION bitmap_exe(fs_header);
     IPB_HMJN_FS::EXECUTION::BIT_MAP_FUNCTIONS::SELECT_BITMAP_DATA test1 = bitmap_exe.get_bitmap_data(30);
     IPB_HMJN_FS::EXECUTION::BIT_MAP_FUNCTIONS::RELOAD_STRUCT test2 = bitmap_exe.write_bit_flag(test1);
     bitmap_exe.reload_bitmap(test2, file);
     test2 = bitmap_exe.delete_bit_flag(test1);
     bitmap_exe.reload_bitmap(test2, file);
+    IPB_HMJN_FS::EXECUTION::BIT_MAP_FUNCTIONS::SELECT_BITMAP_DATA new_clusete_num = bitmap_exe.reload_tree(fs_header.directory_tree_cluster_num, file);
+    test2 = bitmap_exe.write_bit_flag(new_clusete_num);
+    IPB_HMJN_FS::EXECUTION::EXECUTION_STRUCT execution(fs_header);
+    execution.header_data.directory_tree_cluster_num = bitmap_exe.cast_address(new_clusete_num);
+    execution.header_data.directory_tree_depth++;
+    execution.test_write_super_block(file);
+    IPB_HMJN_FS::output_datas(fs_header);
+
+
+
 }
