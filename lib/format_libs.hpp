@@ -5,6 +5,7 @@
 #include<string>
 #include<vector>
 #include "setting_macro.hpp"
+#include <cmath>
 
 #if OUTPUT_DEBUG_LOGS == 1
 #include<bitset>
@@ -634,11 +635,11 @@ namespace IPB_HMJN_FS{
     namespace FS_TYPES{
 
         enum DATA_TYPE{
-            dir = 0,
-            file = 1,
-            simbolic = 2,
-            socket = 3,
-            division = 4,
+            dir = 1,
+            file = 2,
+            simbolic = 3,
+            socket = 4,
+            division = 5,
         };
 
         
@@ -979,7 +980,9 @@ namespace IPB_HMJN_FS{
             using namespace std;
 
             struct result_tree_data{
+                //↓ツリーのたどるべき順路を表している
                 vector<uint64_t>scan_order;
+                //↓最終的な位置
                 uint64_t address;
             };
             struct TREE_FUNCTION: virtual public GET_DATA_METHOD_STRUCT
@@ -1009,41 +1012,47 @@ namespace IPB_HMJN_FS{
                 //     return 0;
                 // }
 
-                result_tree_data scan_tree_data(const uint64_t top_tree_address, const uint64_t tree_deep, fstream file){
+                result_tree_data scan_tree_data(const uint64_t top_tree_address, const uint64_t tree_deep, fstream& file){
                     result_tree_data result_data;
                     result_data.address = top_tree_address;
-                    result_data.scan_order.resize(tree_deep);
+                    // result_data.scan_order.resize(tree_deep);
                     if(!tree_deep)return result_data;
+                    result_data.scan_order.resize(tree_deep);
                     uint64_t before_address = 0;
                     uint64_t now_scan_address = top_tree_address;
                     const uint64_t have_address_num = this->get_one_cluster_bytes() / sizeof(uint64_t);
-                    vector<uint64_t>address_nums(this->get_one_cluster_bytes() / (sizeof(uint64_t)*8) ,0);
-                    for(uint64_t i = 0; i <= tree_deep; i++){
-                        file.seekp((this->get_one_cluster_bytes() * now_scan_address), ios::beg);
+                    vector<uint64_t>address_nums(this->get_one_cluster_bytes() / sizeof(uint64_t) ,0);
+                    for(uint64_t i = 0; i < tree_deep; i++){
+                        file.seekg((this->get_one_cluster_bytes() * now_scan_address), ios::beg);
                         file.read(reinterpret_cast<char *>(address_nums.data()), address_nums.size() * sizeof(uint64_t));
                         uint64_t scan_low = 0;
                         uint64_t scan_top = have_address_num;
                         uint64_t scan_mid = (scan_top - scan_low) / 2;
                         uint64_t j = 0;
+                        //要素が存在している位置を特定するための二分探索
                         for(j = 0; scan_top != scan_mid && scan_low != scan_mid || address_nums.size() < j; j++){
+                            #if OUTPUT_TREE_DATA_LOG == 1
+                            std::cout << "top : " << scan_top << std::endl;
+                            std::cout << "mid : " << scan_mid << std::endl;
+                            std::cout << "low : " << scan_low << std::endl;
+                            #endif
                             if(address_nums.at(scan_mid) == 0) scan_top = scan_mid;
                             else scan_low = scan_mid;
                             scan_mid = (scan_top - scan_low) / 2 + scan_low;
                         }
-                        result_data.scan_order.at(i) = j;
-                        address_nums.at(scan_top) = now_scan_address;
+                        result_data.scan_order.at(i) = scan_mid;
+                        // address_nums.at(scan_top) = now_scan_address;
+                        now_scan_address = address_nums.at(scan_mid);
                         #if OUTPUT_TREE_DATA_LOG == 1
                         std::cout << "----------tree function----------" << std::endl;
                         std::cout << "now scan address : " << now_scan_address << endl;
                         std::cout << "---------------------------------" << std::endl;
                         #endif
                     }
+                    result_data.address = now_scan_address;
                     return result_data;
                 }
-            
-                uint64_t cast_cluster_address(const result_tree_data& data){
-                    
-                }
+
             };
         }
 
@@ -1054,196 +1063,100 @@ namespace IPB_HMJN_FS{
                 uint64_t dir_tree_cluster = 0;
             };
 
-            struct FS_DIRECTORY: virtual public GET_DATA_METHOD_STRUCT{
+            struct FS_DIRECTORY: virtual public GET_DATA_METHOD_STRUCT, virtual public TREE_FUNCTIONS::TREE_FUNCTION{
 
-                FS_DIRECTORY(PARTITION_HEADER &header_data):GET_DATA_METHOD_STRUCT(header_data), FS_STANDARD_STRUCT(header_data){}
-                
-                //空いているIDを得る
-                #if DIRECTORY_VERSION_SCAN_DIR_TREE == 1
-                TREE_STRUCT scan_dir_tree(fstream &file, const uint64_t cluster_num = 0, const uint64_t tree_deep = 0, const uint64_t now_tree_deep = 0){
-                    TREE_STRUCT scan_result;
-                    if(tree_deep <= now_tree_deep)return scan_result;
-                    #if OUTPUT_DIRECTORY_TREE_LOG == 1
-                    cout << "now tree deepth : " << now_tree_deep << endl;
-                    #endif
-                    uint64_t buffer[64];
-                    file.seekp(cluster_num * this->get_one_cluster_bytes(), ios::beg);
-                    file.read(reinterpret_cast<char*>(buffer), 512);
-                    if(buffer[0] == 0){
-                        scan_result.existence_dir = true;
-                        scan_result.dir_tree_cluster = 0;
-                        return scan_result;
-                    }
-                    if(buffer[63] != 0){
-                        scan_result.existence_dir = false;
-                        return scan_result;
-                    }
-                    for(uint64_t i = 0; i < sizeof(buffer); i++){
-                        scan_result = scan_dir_tree(file, tree_deep, buffer[i], now_tree_deep + 1);
-                        if(scan_result.existence_dir){
-                            scan_result.dir_tree_cluster += (tree_deep - now_tree_deep) * sizeof(buffer);
-                            #if OUTPUT_DIRECTORY_TREE_LOG == 1
-                            cout << "log : " << (tree_deep - now_tree_deep) * sizeof(buffer) << endl;
-                            cout << "dir_tree_cluster : " << scan_result.dir_tree_cluster << endl;
-                            #endif
-                            // return scan_result;
-                            break;
-                        }
-                        if(buffer[i] == 0){
-                            scan_result.existence_dir = true;
-                            scan_result.dir_tree_cluster = i;
-                            // return scan_result;
-                            break;
-                        }
-                        scan_result.dir_tree_cluster = 0;
-                        scan_result.existence_dir = false;
-                    }
-                    return scan_result;
+                FS_DIRECTORY(PARTITION_HEADER &header_data):GET_DATA_METHOD_STRUCT(header_data)
+                , FS_STANDARD_STRUCT(header_data)
+                , TREE_FUNCTIONS::TREE_FUNCTION(header_data)
+                , BIT_MAP_FUNCTIONS::BIT_MAP_FUNCTION(header_data){}
+
+                void reload_dir_tree(fstream& file){
+                    IPB_HMJN_FS::EXECUTION::BIT_MAP_FUNCTIONS::SELECT_BITMAP_DATA new_dir_tree_data = reload_tree(this->header_data.directory_tree_cluster_num, file);
+                    this->header_data.directory_tree_cluster_num = this->cast_address(new_dir_tree_data);
+                    this->header_data.directory_tree_depth++;
                 }
-                #else
-                TREE_STRUCT scan_dir_tree(fstream &file, const uint64_t& tree_cluster_num, const uint64_t& tree_deep, const uint64_t now_deep){
-                    TREE_STRUCT result;
-                    if(now_deep >= tree_deep){
-                        result.dir_tree_cluster = tree_cluster_num;
-                        result.existence_dir = true;
-                        return result;
+
+                // // 本当にIDを得たかったの？
+                // // IDはディレクトリエントリだけでしか使わないからこれがあると
+                // // ツリー探索用のクラスにした意味がなくなるから
+                // // ほかの用途で作ろとしたのでは？
+                uint64_t cast_cluster_ID(const TREE_FUNCTIONS::result_tree_data& data){
+                    uint64_t result_address = 0;
+                    for(uint32_t i = 0; i < data.scan_order.size(); i++){
+                        result_address += pow((this->get_one_cluster_bytes() / sizeof(uint64_t)), i) * data.scan_order.at(data.scan_order.size() - 1 + i);
                     }
-                    result = scan_dir_tree(file, tree_cluster_num, tree_deep, now_deep + 1);
-                    if(!result.existence_dir)return result;
-                    
-
-
-                    return result;
-                }
-                #endif
-
-                struct WRITE_ENTRY_DATA{
-                    uint64_t cluster_address = 0;
-                    uint64_t offset_byte = 0;
+                    return result_address;
                 };
-
-                //1クラスタに対するエントリ数が1ではなかったときの処理(1クラスタ内まで探索する処理を書く場所)
-                void scan_directory_entry(){
-                    uint64_t one_cluster_entry_num = this->get_one_cluster_bytes() / sizeof(FS_TYPES::DIR_ENTRY);
-                    if(one_cluster_entry_num > 1){
-
+                
+                // dir treeの
+                uint64_t scan_dir_entry(fstream& file){
+                    TREE_FUNCTIONS::result_tree_data dir_tree_data = scan_tree_data(this->header_data.directory_tree_cluster_num, this->header_data.directory_tree_depth, file);
+                    uint64_t loop_num = this->get_one_cluster_bytes() / sizeof(FS_TYPES::DIR_ENTRY);
+                    uint64_t loop_count = 1;
+                    FS_TYPES::DIR_ENTRY get_dir_entry_data;
+                    file.seekg(dir_tree_data.address * this->get_one_block_bytes(), ios::beg);
+                    bool true_or_flase = true;
+                    for(loop_count = 1; loop_count <= loop_num || true_or_flase; loop_count++){
+                        file.read((char*)&get_dir_entry_data, sizeof(get_dir_entry_data));
+                        true_or_flase = get_dir_entry_data.data_type != 0;
                     }
-                }
-
-                //IDを書くべき場所のアドレスを得る
-                WRITE_ENTRY_DATA get_write_address(const uint64_t ID, fstream &file, const uint64_t tree_deep, uint64_t now_deep = 0){
-                   uint64_t access_num = ID / (sizeof(uint64_t) * 8);
-                   uint64_t next_num = ID % (sizeof(uint64_t) * 8);
-                   #if OUTPUT_DIRECTORY_TREE_LOG == 1
-                   cout << "----------get write address----------" << endl;
-                   cout << "access num : " << access_num << endl;
-                   cout << "next num : " << next_num << endl;
-                   cout << "now tree deep : " << now_deep << endl;
-                   cout << "directory tree deep : " << this->header_data.directory_tree_depth << endl;
-                   cout << now_deep << " < " << (this->header_data.directory_tree_depth) << endl;
-                   cout << "true or false : " << (now_deep < (this->header_data.directory_tree_depth)) << endl;
-                   #endif
-                    WRITE_ENTRY_DATA result_data;
-                    if(now_deep < tree_deep){
-                        WRITE_ENTRY_DATA result_data = get_write_address(next_num, file, tree_deep, now_deep + 1);
-                        uint64_t arr_address[64];
-                        file.seekg(result_data.cluster_address * this->get_one_cluster_bytes(), ios::beg);
-                        file.read(reinterpret_cast<char *>(arr_address), sizeof(arr_address));
-                        result_data.cluster_address = arr_address[access_num];
-                    }
-                    else if(now_deep == tree_deep){
-                        uint64_t one_cluster_entry_num = this->get_one_cluster_bytes() / sizeof(FS_TYPES::DIR_ENTRY);
-                        if(one_cluster_entry_num > 1){
-                            //1クラスタに対するエントリ数が1ではなかったときの処理(1クラスタ内まで探索する処理を書く場所)
-                            scan_directory_entry();
+                    if(!true_or_flase){
+                        //空いているアドレスが次のツリー要素にあるかどうか？
+                        //空きアドレスが次のツリーにある場合はツリーを新しく更新する
+                        if(loop_count == loop_num){
+                            uint64_t one_tree_child_nums = this->get_one_cluster_bytes() / sizeof(uint64_t);
+                            for(uint64_t i = 0; i < dir_tree_data.scan_order.size(); i++){
+                                // ツリーの繰り上がりが発生するかのチェック
+                                if(dir_tree_data.scan_order.at(dir_tree_data.scan_order.size() - 1 - i) >= one_tree_child_nums){
+                                    dir_tree_data.scan_order.at(dir_tree_data.scan_order.size() - 1 - i) = 0;
+                                    // 探索中のツリー位置が既存のツリーを越しているかどうかを見る
+                                    if(i >= (dir_tree_data.scan_order.size() - 1)){
+                                        reload_dir_tree(file);
+                                        dir_tree_data.scan_order.insert(dir_tree_data.scan_order.begin(), 1);
+                                    }
+                                    else{
+                                        dir_tree_data.scan_order.at(dir_tree_data.scan_order.size() - i) += 1;
+                                    }
+                                }
+                            }
                         }
                     }
-                    else{
-                        result_data.offset_byte = ID % (this->get_one_cluster_bytes() / sizeof(FS_TYPES::DIR_ENTRY)) * sizeof(FS_TYPES::DIR_ENTRY);  //--------------------------------------------ワンちゃん512の切り上げでやったほうがいいかも？
-                        #if OUTPUT_DIRECTORY_TREE_LOG == 1
-                        cout << "size : " << sizeof(FS_TYPES::DIR_ENTRY) << endl;
-                        cout << "offset : " << this->get_one_cluster_bytes() / sizeof(FS_TYPES::DIR_ENTRY) << endl;
-                        cout << "result_data.offset_byte : " << result_data.offset_byte << endl;
-                        #endif
-                        result_data.cluster_address = this->header_data.directory_tree_cluster_num;
-                    }
-                    #if OUTPUT_DIRECTORY_TREE_LOG == 1
-                    // cout << "seek size : " << address * this->get_one_cluster_bytes() << endl;
-                    cout << "accsess num : " << access_num << endl;
-                    cout << "next num : " << next_num << endl;
-                    cout << "result sddress : " << result_data.cluster_address << endl;
-                    cout << "result offset byte : " << result_data.offset_byte << endl;
-                    cout << "-------------------------------------" << endl;
-                    #endif
-
-                    return result_data;
+                    uint64_t ID = cast_cluster_ID(dir_tree_data);
+                    ID += loop_num;
+                    return ID;
                 }
 
-                #if OUTPUT_DIRECTORY_TREE_LOG == 1
-                void output_director_entry(const FS_TYPES::DIR_ENTRY &dir_entry){
-                    cout << "----------output directory entry----------" << endl;
-                    cout << "data type : " << static_cast<uint64_t>(dir_entry.data_type) << endl;
-                    cout << "ID : " << dir_entry.ID << endl;
-                    cout << "parent ID : " << dir_entry.parent_ID << endl;
-                    cout << "next sibling ID : " << dir_entry.next_sibling_ID << endl;
-                    cout << "prev sibling ID : " << dir_entry.prev_sibling_ID << endl;
-                    switch(dir_entry.data_type){
-                        case FS_TYPES::DATA_TYPE::dir :
-                        cout << "first child ID : " << dir_entry.another_type_data.dir.first_child_ID << endl;
-                        break;
-                        case FS_TYPES::DATA_TYPE::file :
-                        cout << "bit flag : " << dir_entry.another_type_data.file.bit_flag << endl;
-                        cout << "size : " << dir_entry.another_type_data.file.size << endl;
-                        cout << "file address : " << dir_entry.another_type_data.file.file_address << endl;
-                        break;
-                        case FS_TYPES::DATA_TYPE::simbolic :
-                        cout << "target ID : " << dir_entry.another_type_data.simbolic.target_ID << endl;
-                        break;
-                        default:
-                        cout << "no type!!" << endl;
-                        
-                    }
-                    cout << "mode : " << dir_entry.mode << endl;
-                    cout << "last updata time : " << dir_entry.last_updata_time << endl;
-                    cout << "name size : " << static_cast<uint64_t>(dir_entry.name_size) << endl;
-                    cout << "name : " ;
-                    //256文字ピッタリ配置するため末尾nullを無視する
-                    for(int i = 0; i <= dir_entry.name_size; i++){
-                        cout << dir_entry.name[i];
-                    }
-                    cout << endl;
-                    cout << "dir entry type size : " << sizeof(FS_TYPES::DIR_ENTRY) << endl;
-                    cout << "------------------------------------------" << endl;
-                }
-                #endif
-
-                //ディレクトリエントリを書き込む関数
-                void write_directory_data(FS_TYPES::DIR_ENTRY &dir_entry, fstream &file){
+                void addtion_dir_entry(fstream& file, uint64_t write_ID, const FS_TYPES::DIR_ENTRY& add_entry){
+                    const uint64_t one_tree_child_nums = this->get_one_cluster_bytes() / sizeof(uint64_t);
+                    uint64_t tree_search_num = 0;
+                    uint64_t next_analysis_num = this->header_data.directory_tree_cluster_num;
+                    uint64_t search_address = this->header_data.directory_tree_cluster_num;
                     #if OUTPUT_DIRECTORY_TREE_LOG == 1
-                    output_director_entry(dir_entry);
-                    cout << "----------write directory data----------" << endl;
+                        cout << "----------addtion_dir_entry----------" << endl;
+                        cout << "one tree child nums : " << one_tree_child_nums << endl;
                     #endif
-                    TREE_STRUCT free_dir_cluster;
-                    free_dir_cluster = scan_dir_tree(file, this->header_data.free_ID_tree_cluster_num, this->header_data.free_ID_tree_depth);
-                    #if OUTPUT_DIRECTORY_TREE_LOG == 1
-                    cout << "free ID : tree dir_tree_cluster : " << free_dir_cluster.dir_tree_cluster << endl;
-                    #endif
-                    if(!free_dir_cluster.existence_dir){
-                        free_dir_cluster = scan_dir_tree(file, this->header_data.directory_tree_cluster_num, this->header_data.directory_tree_depth);
+                    for(uint64_t i = 0; i < this->header_data.directory_tree_depth; i++){
+                        tree_search_num = next_analysis_num / one_tree_child_nums;
+                        next_analysis_num = next_analysis_num % one_tree_child_nums;
+                        file.seekg((search_address * this->get_one_cluster_bytes()) + tree_search_num * sizeof(uint64_t), ios::beg);
+                        file.read(reinterpret_cast<char*>(&search_address), sizeof(uint64_t));
                         #if OUTPUT_DIRECTORY_TREE_LOG == 1
-                        cout << "dir tree : dir_tree_cluster : " << free_dir_cluster.dir_tree_cluster << endl;
+                            cout << "loop num : " << i << endl;
+                            cout << "tree_search_num : " << tree_search_num << endl;
+                            cout << "next_analysis_num : " << next_analysis_num << endl;
+                            cout << "search_address : " << search_address << endl;
                         #endif
                     }
-                    WRITE_ENTRY_DATA leaf_data = get_write_address(free_dir_cluster.dir_tree_cluster, file, this->header_data.directory_tree_depth);
+                    next_analysis_num = next_analysis_num % (this->get_one_cluster_bytes() / sizeof(FS_TYPES::DIR_ENTRY));
+                    file.seekp((search_address * this->get_one_cluster_bytes()) + (sizeof(FS_TYPES::DIR_ENTRY) * next_analysis_num));
+                    file.write((char*)&add_entry, sizeof(FS_TYPES::DIR_ENTRY));
+                    cout << "entry type size : " << sizeof(FS_TYPES::DIR_ENTRY) << endl;
                     #if OUTPUT_DIRECTORY_TREE_LOG == 1
-                    cout << "get addres : " << leaf_data.cluster_address << endl;
-                    cout << "get offset : " << leaf_data.offset_byte << endl;
-                    cout << "----------------------------------------" << endl;
+                        cout << "write byte num : " << (search_address * this->get_one_cluster_bytes()) + (sizeof(FS_TYPES::DIR_ENTRY) * next_analysis_num) << endl;
+                        cout << "-------------------------------------" << endl;
                     #endif
-                    file.seekp(leaf_data.cluster_address * this->get_one_cluster_bytes() + leaf_data.offset_byte, ios::beg);
-                    file.write((char*)&dir_entry, sizeof(FS_TYPES::DIR_ENTRY));
-                }
 
+                }
             };
         }
 
@@ -1253,10 +1166,6 @@ namespace IPB_HMJN_FS{
             , BIT_MAP_FUNCTIONS::BIT_MAP_FUNCTION(header_data)
             , FS_DIRECTORY(header_data)
             , GET_DATA_METHOD_STRUCT(header_data){}
-
-            void scan_dir_entry_num(){
-
-            }
 
             struct{
                 void create_dir_entry(FS_TYPES::DIR_ENTRY entry_data){

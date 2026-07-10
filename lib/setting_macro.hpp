@@ -22,9 +22,9 @@
         #define OUTPUT_FORMAT_LOG 1
         #define OUTPUT_EXECUTION_LOG 1
         #if OUTPUT_EXECUTION_LOG == 1
-            #define OUTPUT_DIRECTORY_TREE_LOG 1
             #define OUTPUT_BITMAP_DATA_LOG 1
             #define OUTPUT_TREE_DATA_LOG 1
+            #define OUTPUT_DIRECTORY_TREE_LOG 1
 
 
         #endif
