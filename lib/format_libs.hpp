@@ -80,8 +80,7 @@ namespace IPB_HMJN_FS{
 
     static void init_crc32_table()
     {
-        for (uint32_t i = 0; i < 256; i++)
-        {
+        for (uint32_t i = 0; i < 256; i++){
             uint32_t crc = i;
 
             for (int j = 0; j < 8; j++)
@@ -1030,8 +1029,9 @@ namespace IPB_HMJN_FS{
                         uint64_t scan_mid = (scan_top - scan_low) / 2;
                         uint64_t j = 0;
                         //要素が存在している位置を特定するための二分探索
-                        for(j = 0; scan_top != scan_mid && scan_low != scan_mid || address_nums.size() < j; j++){
+                        for(j = 0; scan_top != scan_mid && scan_low != scan_mid && j < address_nums.size(); j++){
                             #if OUTPUT_TREE_DATA_LOG == 1
+                            std::cout << "loop count : " << j << std::endl;
                             std::cout << "top : " << scan_top << std::endl;
                             std::cout << "mid : " << scan_mid << std::endl;
                             std::cout << "low : " << scan_low << std::endl;
@@ -1053,15 +1053,24 @@ namespace IPB_HMJN_FS{
                     return result_data;
                 }
 
+
+                // // 本当にIDを得たかったの？
+                // // IDはディレクトリエントリだけでしか使わないからこれがあると
+                // // ツリー探索用のクラスにした意味がなくなるから
+                // // ほかの用途で作ろとしたのでは？
+                uint64_t cast_cluster_ID(const TREE_FUNCTIONS::result_tree_data& data){
+                    uint64_t result_ID = 0;
+                    for(uint32_t i = 0; i < data.scan_order.size(); i++){
+                        result_ID += pow((this->get_one_cluster_bytes() / sizeof(uint64_t)), i) * data.scan_order.at(data.scan_order.size() - 1 + i);
+                    }
+                    return result_ID;
+                };
+
             };
         }
 
         namespace DIRECTORY_TREE{
             using namespace std;
-            struct TREE_STRUCT{
-                bool existence_dir = false;
-                uint64_t dir_tree_cluster = 0;
-            };
 
             struct FS_DIRECTORY: virtual public GET_DATA_METHOD_STRUCT, virtual public TREE_FUNCTIONS::TREE_FUNCTION{
 
@@ -1075,18 +1084,6 @@ namespace IPB_HMJN_FS{
                     this->header_data.directory_tree_cluster_num = this->cast_address(new_dir_tree_data);
                     this->header_data.directory_tree_depth++;
                 }
-
-                // // 本当にIDを得たかったの？
-                // // IDはディレクトリエントリだけでしか使わないからこれがあると
-                // // ツリー探索用のクラスにした意味がなくなるから
-                // // ほかの用途で作ろとしたのでは？
-                uint64_t cast_cluster_ID(const TREE_FUNCTIONS::result_tree_data& data){
-                    uint64_t result_address = 0;
-                    for(uint32_t i = 0; i < data.scan_order.size(); i++){
-                        result_address += pow((this->get_one_cluster_bytes() / sizeof(uint64_t)), i) * data.scan_order.at(data.scan_order.size() - 1 + i);
-                    }
-                    return result_address;
-                };
                 
                 // dir treeの
                 uint64_t scan_dir_entry(fstream& file){
@@ -1126,10 +1123,12 @@ namespace IPB_HMJN_FS{
                     return ID;
                 }
 
+                //多分ツリー探索方法間違えてるから改良予定
                 void addtion_dir_entry(fstream& file, uint64_t write_ID, const FS_TYPES::DIR_ENTRY& add_entry){
                     const uint64_t one_tree_child_nums = this->get_one_cluster_bytes() / sizeof(uint64_t);
                     uint64_t tree_search_num = 0;
-                    uint64_t next_analysis_num = this->header_data.directory_tree_cluster_num;
+                    // uint64_t next_analysis_num = this->header_data.directory_tree_cluster_num;
+                    uint64_t next_analysis_num = write_ID;
                     uint64_t search_address = this->header_data.directory_tree_cluster_num;
                     #if OUTPUT_DIRECTORY_TREE_LOG == 1
                         cout << "----------addtion_dir_entry----------" << endl;
@@ -1150,7 +1149,6 @@ namespace IPB_HMJN_FS{
                     next_analysis_num = next_analysis_num % (this->get_one_cluster_bytes() / sizeof(FS_TYPES::DIR_ENTRY));
                     file.seekp((search_address * this->get_one_cluster_bytes()) + (sizeof(FS_TYPES::DIR_ENTRY) * next_analysis_num));
                     file.write((char*)&add_entry, sizeof(FS_TYPES::DIR_ENTRY));
-                    cout << "entry type size : " << sizeof(FS_TYPES::DIR_ENTRY) << endl;
                     #if OUTPUT_DIRECTORY_TREE_LOG == 1
                         cout << "write byte num : " << (search_address * this->get_one_cluster_bytes()) + (sizeof(FS_TYPES::DIR_ENTRY) * next_analysis_num) << endl;
                         cout << "-------------------------------------" << endl;
@@ -1158,6 +1156,103 @@ namespace IPB_HMJN_FS{
 
                 }
             };
+        }
+
+        namespace FREE_ID_TREE{
+            using namespace std;
+
+            struct free_ID_data{
+                vector<uint64_t>free_ID_list;
+                //free ID listの最後の要素番号
+                uint64_t select_number;
+
+                uint64_t get_free_ID(){
+                    return free_ID_list.at(select_number);
+                }
+            };
+
+            struct FS_FREE_ID: virtual public GET_DATA_METHOD_STRUCT, virtual public TREE_FUNCTIONS::TREE_FUNCTION{
+
+                free_ID_data free_ID;
+
+                FS_FREE_ID(PARTITION_HEADER &header_data):GET_DATA_METHOD_STRUCT(header_data)
+                , FS_STANDARD_STRUCT(header_data)
+                , TREE_FUNCTIONS::TREE_FUNCTION(header_data)
+                , BIT_MAP_FUNCTIONS::BIT_MAP_FUNCTION(header_data){}
+
+                
+                void reload_free_ID_tree(fstream& file){
+                    IPB_HMJN_FS::EXECUTION::BIT_MAP_FUNCTIONS::SELECT_BITMAP_DATA new_dir_tree_data = reload_tree(this->header_data.free_ID_tree_cluster_num, file);
+                    this->header_data.free_ID_tree_cluster_num = this->cast_address(new_dir_tree_data);
+                    this->header_data.free_ID_tree_depth++;
+                }
+
+                //free_IDが更新される
+                void scan_free_ID_address(fstream& file){
+                    TREE_FUNCTIONS::result_tree_data dir_tree_data = scan_tree_data(this->header_data.directory_tree_cluster_num, this->header_data.directory_tree_depth, file);
+                    uint64_t &address = dir_tree_data.address;
+                    uint64_t scan_top = this->get_one_cluster_bytes() / sizeof(uint64_t);
+                    uint64_t scan_low = 0;
+                    uint64_t scan_mid = (scan_top + scan_low) / 2;
+                    vector<uint64_t> ID_list(this->get_one_cluster_bytes() / sizeof(uint64_t), 0);
+                    file.seekg(dir_tree_data.address * this->get_one_cluster_bytes(), ios::beg);
+                    file.read(reinterpret_cast<char *>(ID_list.data()), ID_list.size() * sizeof(uint64_t));
+                    
+                    for(uint64_t i = 0; scan_top != scan_mid && scan_low != scan_mid && i < ID_list.size(); i++){
+                        if(ID_list.at(scan_mid) == 0)scan_top = scan_mid;
+                        else scan_low = scan_mid;
+                        scan_mid = (scan_top + scan_low) / 2;
+                    }
+                    free_ID.free_ID_list = ID_list;
+                    free_ID.select_number = scan_top;
+                    return ;
+                }
+
+                void addtion_free_ID(fstream& file, uint64_t write_ID, uint64_t add_free_ID){
+                    const uint64_t one_tree_child_nums = this->get_one_cluster_bytes() / sizeof(uint64_t);
+                    uint64_t tree_search_num = 0;
+                    // uint64_t next_analysis_num = this->header_data.directory_tree_cluster_num;
+                    uint64_t next_analysis_num = write_ID;
+                    uint64_t search_address = this->header_data.free_ID_tree_cluster_num;
+                    #if OUTPUT_FREE_ID_TREE_LOG == 1
+                        cout << "----------addtion_free_ID----------" << endl;
+                        cout << "one tree child nums : " << one_tree_child_nums << endl;
+                    #endif
+                    for(uint64_t i = 0; i < this->header_data.free_ID_tree_depth; i++){
+                        tree_search_num = next_analysis_num / one_tree_child_nums;
+                        next_analysis_num = next_analysis_num % one_tree_child_nums;
+                        file.seekg((search_address * this->get_one_cluster_bytes()) + tree_search_num * sizeof(uint64_t), ios::beg);
+                        file.read(reinterpret_cast<char*>(&search_address), sizeof(uint64_t));
+                        #if OUTPUT_FREE_ID_TREE_LOG == 1
+                            cout << "loop num : " << i << endl;
+                            cout << "tree_search_num : " << tree_search_num << endl;
+                            cout << "next_analysis_num : " << next_analysis_num << endl;
+                            cout << "search_address : " << search_address << endl;
+                        #endif
+                    }
+                    next_analysis_num = next_analysis_num % (this->get_one_cluster_bytes() / sizeof(uint64_t));
+                    file.seekp((search_address * this->get_one_cluster_bytes()) + (sizeof(uint64_t) * next_analysis_num));
+                    file.write(reinterpret_cast<char *>(&add_free_ID), sizeof(uint64_t));
+                    #if OUTPUT_FREE_ID_TREE_LOG == 1
+                        cout << "write byte num : " << (search_address * this->get_one_cluster_bytes()) + (sizeof(FS_TYPES::DIR_ENTRY) * next_analysis_num) << endl;
+                        cout << "-------------------------------------" << endl;
+                    #endif
+                }
+
+                // 今は最低限の要素を考えているため多分作らなくても大丈夫
+                // uint64_t delete_free_ID(fstream &file){
+
+                // }
+
+                uint64_t use_free_ID(fstream &file){
+                    uint64_t use_number = free_ID.get_free_ID();
+                    if(use_number != 0)return use_number;
+                    scan_free_ID_address(file);
+                    uint64_t use_number = free_ID.get_free_ID();
+                    return use_number;
+                }
+            };
+
         }
 
         struct FS_FUNCTIONS: virtual public FS_STANDARD_STRUCT, public DIRECTORY_TREE::FS_DIRECTORY, virtual public TREE_FUNCTIONS::TREE_FUNCTION, virtual public BIT_MAP_FUNCTIONS::BIT_MAP_FUNCTION{
@@ -1171,7 +1266,7 @@ namespace IPB_HMJN_FS{
                 void create_dir_entry(FS_TYPES::DIR_ENTRY entry_data){
 
                 }
-                
+
                 void delete_dir_entry(){}
 
             }dir_operation;

@@ -25,6 +25,7 @@
             #define OUTPUT_BITMAP_DATA_LOG 1
             #define OUTPUT_TREE_DATA_LOG 1
             #define OUTPUT_DIRECTORY_TREE_LOG 1
+            #define OUTPUT_FREE_ID_TREE_LOG 1
 
 
         #endif
