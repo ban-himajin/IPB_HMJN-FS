@@ -23,3 +23,4 @@ pub const READ_ALGORITHM_NUM: u64 = 0;
 pub const WRITE_ALGORITHM_NUM: u64 = 0;
 pub const CHECK_SUM: u64 = 0;
 
+pub const OUTPUT_FILE_NAME: &str = "output_file.bin";

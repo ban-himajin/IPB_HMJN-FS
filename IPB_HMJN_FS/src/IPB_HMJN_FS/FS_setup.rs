@@ -1,7 +1,6 @@
 use core::error;
-use std::{io, fs, result, string::String, mem};
+use std::{io, result, string::String, mem};
 use crate::IPB_HMJN_FS;
-use crate::IPB_HMJN_FS::FS_core_types::SuperBlockData;
 use crate::IPB_HMJN_FS::checksum_functions::CRC32;
 use crate::IPB_HMJN_FS::super_block_config;
 
@@ -86,12 +85,14 @@ fn GetSetupData() -> result::Result<GetInputData, Box<dyn std::error::Error>>{
     }
     partition_cluster_size = input_data.trim().parse()?;
     input_data.clear();
-    {//バックアップ数を取得
-        println!("バックアップはいくつですか？");
+    let max_backup = partition_cluster_size / 8 / 8 + 1;
+    while back_up_nums == 0 && max_backup >= back_up_nums{//バックアップ数を取得
+        
+        println!("バックアップはいくつですか？ (1 ~ {})", max_backup);
         io::stdin()
             .read_line(&mut input_data)?;
+        back_up_nums = input_data.trim().parse()?;
     }
-    back_up_nums = input_data.trim().parse()?;
 
     Ok(GetInputData {
         partition_LBA: partition_LBA,
@@ -149,12 +150,13 @@ fn GetSetupData() -> result::Result<GetInputData, Box<dyn std::error::Error>>{
     }
     partition_cluster_size = input_data.trim().parse()?;
     input_data.clear();
-    {//Get the number of backups
-        println!("How many backups are there?");
+    let max_backup = partition_cluster_size / 8 / 8 + 1;
+    while back_up_nums == 0 && max_backup >= back_up_nums{//Get the number of backups
+        println!("How many backups are there? (1 ~ {})", max_backup);
         io::stdin()
             .read_line(&mut input_data)?;
+        back_up_nums = input_data.trim().parse()?;
     }
-    back_up_nums = input_data.trim().parse()?;
 
     Ok(GetInputData {
         partition_LBA: partition_LBA,
@@ -237,11 +239,11 @@ fn SetupSuperBlock(setupdata: GetInputData) -> FS_core_types::SuperBlockData{
 }
 
 // ホストOS上で使うことを前提としたもの
-pub fn SetupSuperBlockData() -> result::Result<(), Box<dyn error::Error>>{
+pub fn SetupSuperBlockData() -> result::Result<FS_core_types::SuperBlockData, Box<dyn error::Error>>{
     let setupdata = GetSetupData()?;
     let super_block = SetupSuperBlock(setupdata);
 
-    Ok(())
+    Ok(super_block)
 }
 
 

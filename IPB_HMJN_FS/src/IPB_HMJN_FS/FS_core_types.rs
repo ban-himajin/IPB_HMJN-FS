@@ -68,6 +68,16 @@ impl Default for SuperBlockData{
         }
     }
 }
+impl SuperBlockData{
+    pub fn GetOneBlockBytes(&self) -> u64{
+        self.one_sector_size * self.one_block_sector_num
+    }
+
+    pub fn GetOneClusterBytes(&self) -> u64{
+        self.GetOneBlockBytes() * self.one_cluster_block_num
+    }
+
+}
 
 #[repr(u64)]
 pub enum CheckSumTypes {
