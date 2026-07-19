@@ -69,12 +69,12 @@ impl Default for SuperBlockData{
     }
 }
 impl SuperBlockData{
-    pub fn GetOneBlockBytes(&self) -> u64{
+    pub fn get_one_block_bytes(&self) -> u64{
         self.one_sector_size * self.one_block_sector_num
     }
 
-    pub fn GetOneClusterBytes(&self) -> u64{
-        self.GetOneBlockBytes() * self.one_cluster_block_num
+    pub fn get_one_cluster_bytes(&self) -> u64{
+        self.get_one_block_bytes() * self.one_cluster_block_num
     }
 
 }

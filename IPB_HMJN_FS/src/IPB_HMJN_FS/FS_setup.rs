@@ -40,7 +40,7 @@ impl GetInputData{
 }
 
 #[cfg(feature = "jp")]
-fn GetSetupData() -> result::Result<GetInputData, Box<dyn std::error::Error>>{
+fn get_setup_data() -> result::Result<GetInputData, Box<dyn std::error::Error>>{
     let mut input_data = String::new();
     let mut partition_LBA: u64 = 0;
     let mut one_sector_size: u64 = 0;
@@ -105,7 +105,7 @@ fn GetSetupData() -> result::Result<GetInputData, Box<dyn std::error::Error>>{
 }
 
 #[cfg(not(feature = "jp"))]
-fn GetSetupData() -> result::Result<GetInputData, Box<dyn std::error::Error>>{
+fn get_setup_data() -> result::Result<GetInputData, Box<dyn std::error::Error>>{
     let mut input_data = String::new();
     let mut partition_LBA: u64 = 0;
     let mut one_sector_size: u64 = 0;
@@ -167,7 +167,7 @@ fn GetSetupData() -> result::Result<GetInputData, Box<dyn std::error::Error>>{
     })
 }
 
-pub fn MakingCheckSumData(super_block: &FS_core_types::SuperBlockData) -> [u8; 12]{
+pub fn making_checksum_data(super_block: &FS_core_types::SuperBlockData) -> [u8; 12]{
     let arr = [
         super_block.fs_version.top as u8,
         super_block.fs_version.mid as u8,
@@ -186,7 +186,7 @@ pub fn MakingCheckSumData(super_block: &FS_core_types::SuperBlockData) -> [u8; 1
 }
 
 //チェックサムの種類が増えたらここに足していく
-pub fn CheckSum(use_data: &[u8]) -> u64{
+pub fn check_sum(use_data: &[u8]) -> u64{
     let result_data: u64;
     match super_block_config::WHAT_CHACKSUM {
         FS_core_types::CheckSumTypes::CRC32 => {
@@ -196,7 +196,7 @@ pub fn CheckSum(use_data: &[u8]) -> u64{
     result_data
 }
 
-fn SetupSuperBlock(setupdata: GetInputData) -> FS_core_types::SuperBlockData{
+fn setup_super_block(setupdata: GetInputData) -> FS_core_types::SuperBlockData{
     let mut super_block = FS_core_types::SuperBlockData::default();
     let mut now_select_cluster = 1;
 
@@ -232,16 +232,16 @@ fn SetupSuperBlock(setupdata: GetInputData) -> FS_core_types::SuperBlockData{
 
     super_block.read_algorithm_num = 0;
 
-    super_block.check_sum = CheckSum(&MakingCheckSumData(&super_block));
+    super_block.check_sum = check_sum(&making_checksum_data(&super_block));
 
     super_block
 
 }
 
 // ホストOS上で使うことを前提としたもの
-pub fn SetupSuperBlockData() -> result::Result<FS_core_types::SuperBlockData, Box<dyn error::Error>>{
-    let setupdata = GetSetupData()?;
-    let super_block = SetupSuperBlock(setupdata);
+pub fn setup_super_block_data() -> result::Result<FS_core_types::SuperBlockData, Box<dyn error::Error>>{
+    let setupdata = get_setup_data()?;
+    let super_block = setup_super_block(setupdata);
 
     Ok(super_block)
 }
