@@ -6,5 +6,6 @@ pub mod constant;
 pub mod error_handlind;
 pub mod super_block_config;
 pub mod checksum_functions;
+pub mod general_function;
 
 pub mod FS_execution;

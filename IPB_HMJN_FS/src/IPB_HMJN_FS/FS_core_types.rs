@@ -1,4 +1,5 @@
 use super::constant;
+use std::convert::TryFrom;
 
 //supere block types
 #[derive(Debug, Clone, Copy)]
@@ -93,39 +94,60 @@ pub enum EntryStructType{
     symbolic = 3,
     division = 4,
 }
+impl TryFrom<u8> for EntryStructType{
+    type Error = ();
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(Self::directory),
+            2 => Ok(Self::file),
+            3 => Ok(Self::symbolic),
+            4 => Ok(Self::division),
+            _ => Err(())
+        }
+    }
+}
+impl Default for EntryStructType{
+    fn default() -> Self {
+        EntryStructType::directory
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
+#[repr(C , packed(1))]
 struct EntryPutting{
     putting: [u8; 256-1-8-8-25],
+    // putting: [u8; 214],
+    // putting: [u8; 211],
 }
 
 #[derive(Debug, Clone, Copy)]
-struct DirectoryType{
-    first_child_ID: u64,
+pub struct DirectoryType{
+    pub first_child_ID: u64,
 }
 
 #[derive(Debug, Clone, Copy)]
-struct FileType{
-    bit_flag: u64,
-    size: u64,
-    file_address: u64,
+pub struct FileType{
+    pub bit_flag: u64,
+    pub size: u64,
+    pub file_address: u64,
 }
 
 #[derive(Debug, Clone, Copy)]
-struct SymbolicType{
-    target_ID: u64,
+pub struct SymbolicType{
+    pub target_ID: u64,
 }
 
 //ここは改善予定
 #[derive(Debug, Clone, Copy)]
-struct DivisionType{
-    bit_flag: u64,
-    block_address: u64,
-    sector_address: u64,
+pub struct DivisionType{
+    pub bit_flag: u64,
+    pub block_address: u64,
+    pub sector_address: u64,
 }
 
 #[derive(Debug, Clone, Copy)]
-enum EntryType{
+pub enum EntryType{
     Pad(EntryPutting),
     Directory(DirectoryType),
     File(FileType),
@@ -136,18 +158,38 @@ enum EntryType{
 #[derive(Debug)]
 #[repr(C , packed(1))]
 pub struct Entry{
-    data_type: EntryStructType,
-    ID: u64,
-    parent_ID: u64,
-    next_sibling_ID: u64,
-    prev_sibling_ID: u64,
-    entry_type: EntryType,
-    mode: u64,
-    last_updatated_time: u64,
-    name_size: u8,
-    name: [u8; 255],
-}
+    pub data_type: EntryStructType,
+    pub ID: u64,
+    pub parent_ID: u64,
+    pub next_sibling_ID: u64,
+    pub prev_sibling_ID: u64,
 
+    // entry_type: EntryType,
+    // pub putting: [u8; 256-1-8-8-25],
+    pub putting: [u8; 512-256-1*2-8*6],
+
+    pub mode: u64,
+    pub last_updatated_time: u64,
+    pub name_size: u8,
+    // name: [u8; 255],
+    pub name: [u8; 256],
+}
+impl Entry{
+    pub fn from_bytes(buf: &[u8]) -> Self{
+        Self{
+            data_type: EntryStructType::try_from(buf[0]).unwrap_or_default(),
+            ID: u64::from_le_bytes(buf[1..9].try_into().unwrap()).try_into().unwrap_or_default(),
+            parent_ID: u64::from_le_bytes(buf[9..17].try_into().unwrap()).try_into().unwrap_or_default(),
+            next_sibling_ID: u64::from_le_bytes(buf[17..25].try_into().unwrap()).try_into().unwrap_or_default(),
+            prev_sibling_ID: u64::from_le_bytes(buf[25..33].try_into().unwrap()).try_into().unwrap_or_default(),
+            putting: buf[33..239].try_into().unwrap(),
+            mode: u64::from_le_bytes(buf[239..247].try_into().unwrap()).try_into().unwrap_or_default(),
+            last_updatated_time: u64::from_le_bytes(buf[247..255].try_into().unwrap()).try_into().unwrap_or_default(),
+            name_size: buf[256].try_into().unwrap(),
+            name: buf[257..512].try_into().unwrap(),
+        }
+    }
+}
 
 
 

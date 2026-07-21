@@ -1,6 +1,5 @@
-use std::{cell::RefCell, error, fs, io::{Read, Seek, SeekFrom, Write}, mem, result};
-use crate::IPB_HMJN_FS::FS_core_types;
-
+use std::{cell::RefCell, collections::VecDeque, error, fs, io::{Read, Seek, SeekFrom, Write}, mem, result};
+use crate::IPB_HMJN_FS::{FS_core_types, FS_execution::FS_function_parts::bitmap_function::bitmap_parts::FreeBits::defragmentation};
 //bitmapから空きを探し空いている位置をデータとして持つための構造体
 #[derive(Debug, Clone, Copy)]
 pub struct ResultFreeBitData{
@@ -17,12 +16,48 @@ impl Default for ResultFreeBitData{
         }
     }
 }
+impl ResultFreeBitData{
+    fn cast_address_data(&self) -> u64{
+        self.index * u8::BITS as u64 + self.offset as u64
+    }
+}
 
+//キャストアドレスで得られるアドレスの戻り値
 #[derive(Debug)]
+pub enum CastAddressData{
+    defrag(u64),
+    frag(Vec<u64>),
+    error(u8),
+}
+
+#[derive(Debug, Clone)]
 pub enum FreeBits{
     defragmentation(ResultFreeBitData),
     fragmentation(Vec<ResultFreeBitData>),
     error(u8),
+}
+impl FreeBits{
+    pub fn cast_address(&self) -> CastAddressData{
+        let cast_data: CastAddressData;
+        match self {
+            Self::defragmentation(data) =>{
+                cast_data = CastAddressData::defrag(data.cast_address_data())
+            }
+            Self::fragmentation(data) => {
+                let mut vec_data: Vec<u64> = vec![0; data.len()];
+                for index in 0..data.len(){
+                    if let Some(s) = data.get(index){
+                        vec_data.get_mut(index).map(|x| *x = s.cast_address_data());
+                    }
+                }
+                cast_data = CastAddressData::frag(vec_data)
+            }
+            Self::error(error) => {
+                cast_data = CastAddressData::error(*error);
+            }
+        }
+        cast_data
+    }
 }
 
 //bitmapの空きを高速に探すために使うvecに入れる構造体
