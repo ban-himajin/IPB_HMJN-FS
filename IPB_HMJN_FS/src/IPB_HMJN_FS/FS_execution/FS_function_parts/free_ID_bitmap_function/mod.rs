@@ -3,23 +3,23 @@ use crate::IPB_HMJN_FS::FS_core_types::{SuperBlockData};
 
 use std::{fs, result, error};
 
-pub struct Bitmap{
+pub struct FreeIDBitmap{
     pub bitmap_data: FreeBitmap,
 }
-impl Bitmap{
+impl FreeIDBitmap{
     pub fn set_free_bitmap_data(&self, super_block: &SuperBlockData){
         self.bitmap_data.set_free_bitmap(super_block);
     }
 
     pub fn get_bitmap(&self, super_block: &SuperBlockData, output_file: &mut fs::File) -> result::Result<(), Box<dyn error::Error>>{
         Ok(
-            self.bitmap_data.get_bitmap(super_block, super_block.directory_tree_address, output_file)?
+            self.bitmap_data.get_bitmap(super_block, super_block.free_ID_bitmap_address, output_file)?
         )
     }
 
     pub fn reload_bitmap(&self, super_block: &SuperBlockData, output_file: &mut fs::File) -> result::Result<(), Box<dyn error::Error>>{
         Ok(
-            self.bitmap_data.reload_bitmap(super_block, super_block.directory_tree_address, output_file)?
+            self.bitmap_data.reload_bitmap(super_block, super_block.free_ID_bitmap_address, output_file)?
         )
     }
 
@@ -36,7 +36,7 @@ impl Bitmap{
     pub fn new(super_block: &SuperBlockData, output_file: &mut fs::File) -> result::Result<Self, Box<dyn error::Error>>{
         Ok(
             Self{
-                bitmap_data: FreeBitmap::new(super_block, super_block.directory_tree_address, output_file)?,
+                bitmap_data: FreeBitmap::new(super_block, super_block.free_ID_bitmap_address, output_file)?,
             }
         )
     }

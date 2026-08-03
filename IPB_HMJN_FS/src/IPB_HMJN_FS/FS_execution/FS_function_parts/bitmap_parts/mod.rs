@@ -1,11 +1,11 @@
 use std::{cell::RefCell, collections::VecDeque, error, fs, io::{Read, Seek, SeekFrom, Write}, mem, result};
-use crate::IPB_HMJN_FS::{FS_core_types, FS_execution::FS_function_parts::bitmap_function::bitmap_parts::FreeBits::defragmentation};
+use crate::IPB_HMJN_FS::{FS_core_types, FS_execution::FS_function_parts::bitmap_parts::FreeBits::defragmentation};
 //bitmapから空きを探し空いている位置をデータとして持つための構造体
 #[derive(Debug, Clone, Copy)]
 pub struct ResultFreeBitData{
-    get_bit_num: u64,
-    index: u64,
-    offset: u8,
+    pub get_bit_num: u64,
+    pub index: u64,
+    pub offset: u8,
 }
 impl Default for ResultFreeBitData{
     fn default() -> Self {
@@ -43,6 +43,7 @@ impl FreeBits{
             Self::defragmentation(data) =>{
                 cast_data = CastAddressData::defrag(data.cast_address_data())
             }
+
             Self::fragmentation(data) => {
                 let mut vec_data: Vec<u64> = vec![0; data.len()];
                 for index in 0..data.len(){
@@ -52,6 +53,7 @@ impl FreeBits{
                 }
                 cast_data = CastAddressData::frag(vec_data)
             }
+            
             Self::error(error) => {
                 cast_data = CastAddressData::error(*error);
             }
@@ -102,8 +104,8 @@ impl FreeBitmap{
     }
 
     //実際のディスク内のbitmapを取得をする
-    pub fn get_bitmap(&self, super_block: &FS_core_types::SuperBlockData, output_file: &mut fs::File) -> result::Result<(), Box<dyn  error::Error>>{
-        output_file.seek(SeekFrom::Start(super_block.get_one_cluster_bytes() * super_block.bitmap_cluster_num))?;
+    pub fn get_bitmap(&self, super_block: &FS_core_types::SuperBlockData, select_address: u64, output_file: &mut fs::File) -> result::Result<(), Box<dyn  error::Error>>{
+        output_file.seek(SeekFrom::Start(super_block.get_one_cluster_bytes() * select_address))?;
         output_file.read_exact(&mut self.bitmap.borrow_mut()[..])?;
         Ok(())
     }
@@ -112,8 +114,8 @@ impl FreeBitmap{
     //現在はすべてのbitmapを同時更新をしている
     //修正予定★
     //最終的に特定のbit範囲だけを書き換えをする形にしたい
-    pub fn reload_bitmap(&self, super_block: &FS_core_types::SuperBlockData, output_file: &mut fs::File) -> result::Result<(), Box<dyn  error::Error>>{
-        output_file.seek(SeekFrom::Start(super_block.get_one_cluster_bytes() * super_block.bitmap_cluster_num))?;
+    pub fn reload_bitmap(&self, super_block: &FS_core_types::SuperBlockData, select_address: u64, output_file: &mut fs::File) -> result::Result<(), Box<dyn  error::Error>>{
+        output_file.seek(SeekFrom::Start(super_block.get_one_cluster_bytes() * select_address))?;
         output_file.write_all(&self.bitmap.borrow())?;
         Ok(())
     }
@@ -241,7 +243,7 @@ impl FreeBitmap{
     
     }
 
-    pub fn new(super_block: &FS_core_types::SuperBlockData, output_file: &mut fs::File) -> result::Result<Self, Box<dyn error::Error>>{
+    pub fn new(super_block: &FS_core_types::SuperBlockData, select_address: u64, output_file: &mut fs::File) -> result::Result<Self, Box<dyn error::Error>>{
         let capacity = (super_block.partition_cluster_size as usize + (mem::size_of::<u8>() * 8) - 1) / (mem::size_of::<u8>() * 8);
         let bitmap: RefCell<Vec<u8>> = RefCell::new(vec![0; capacity]);
         let free_bitmap_datas: RefCell<Vec<FreeBitmapData>> = RefCell::new(vec![FreeBitmapData::default(); capacity]);
@@ -251,7 +253,7 @@ impl FreeBitmap{
             free_bitmap_datas,
         };
 
-        bitmap_datas.get_bitmap(super_block, output_file)?;
+        bitmap_datas.get_bitmap(super_block, select_address, output_file)?;
         bitmap_datas.set_free_bitmap(super_block);
 
         Ok(bitmap_datas)

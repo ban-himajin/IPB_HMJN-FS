@@ -1,4 +1,4 @@
-use super::constant;
+use crate::IPB_HMJN_FS::Constant::{self, NAME_TREE_ADDRESS, NAME_TREE_DEPTH};
 use std::convert::TryFrom;
 
 //supere block types
@@ -30,14 +30,16 @@ pub struct SuperBlockData{
     pub one_block_sector_num: u64,
     pub one_cluster_block_num: u64,
     pub partition_cluster_size: u64,
-    pub bitmap_cluster_num: u64,
+    pub bitmap_address: u64,
     pub bitmap_size: u64,
     pub back_up_num: u64,
-    pub back_up_list_cluster_num: u64,
-    pub directory_tree_cluster_num: u64,
+    pub back_up_list_address: u64,
+    pub directory_tree_address: u64,
     pub directory_tree_depth: u64,
-    pub free_ID_tree_cluster_num: u64,
-    pub free_ID_tree_depth: u64,
+    pub name_tree_address: u64,
+    pub name_tree_depth: u64,
+    pub free_ID_bitmap_address: u64,
+    pub free_ID_bitmap_size: u64,
     pub reservation_space_size: u64,
     pub read_algorithm_num: u64,
     pub write_algorithm_num: u64,
@@ -54,14 +56,16 @@ impl Default for SuperBlockData{
             one_block_sector_num: constant::ONE_BLOCK_SECTOR_NUM,
             one_cluster_block_num: constant::ONE_CLUSTER_BLOCK_NUM,
             partition_cluster_size: constant::PARTITION_CLUSTER_SIZE,
-            bitmap_cluster_num: constant::BITMAP_CLUSTER_NUM,
+            bitmap_address: constant::BITMAP_ADDRESS,
             bitmap_size: constant::BITMAP_SIZE,
             back_up_num: constant::BACK_UP_NUM,
-            back_up_list_cluster_num: constant::BACK_UP_LIST_CLUSTER_NUM,
-            directory_tree_cluster_num: constant::DIRECTORY_TREE_CLUSTER_NUM,
+            back_up_list_address: constant::BACK_UP_LIST_ADDRESS,
+            directory_tree_address: constant::DIRECTORY_TREE_ADDRESS,
             directory_tree_depth: constant::DIRECTORY_TREE_DEPTH,
-            free_ID_tree_cluster_num: constant::FREE_ID_TREE_CLUSTER_NUM,
-            free_ID_tree_depth: constant::FREE_ID_TREE_DEPTH,
+            name_tree_address: NAME_TREE_ADDRESS,
+            name_tree_depth: NAME_TREE_DEPTH,
+            free_ID_bitmap_address: constant::FREE_ID_BITMAP_ADDRESS,
+            free_ID_bitmap_size: constant::FREE_ID_BITMAP_SIZE,
             reservation_space_size: constant::RESERVATION_SPACE_SIZE,
             read_algorithm_num: constant::READ_ALGORITHM_NUM,
             write_algorithm_num: constant::WRITE_ALGORITHM_NUM,
@@ -89,10 +93,10 @@ pub enum CheckSumTypes {
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum EntryStructType{
-    directory = 1,
-    file = 2,
-    symbolic = 3,
-    division = 4,
+    directory = 0,
+    file = 1,
+    symbolic = 2,
+    division = 3,
 }
 impl TryFrom<u8> for EntryStructType{
     type Error = ();
@@ -120,10 +124,38 @@ struct EntryPutting{
     // putting: [u8; 214],
     // putting: [u8; 211],
 }
+impl EntryPutting{
+    // pub fn from_bytes(buf: &[u8]) -> Self{
+    //     Self{
+    //         putting: buf,
+    //     }
+    // }
+
+    pub fn to_le_bytes(&self) -> Vec<u8>{
+        let mut buf:Vec<u8> = Vec::new();
+        buf.extend(self.putting);
+        buf
+    }
+
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct DirectoryType{
     pub first_child_ID: u64,
+}
+impl DirectoryType{
+    pub fn from_bytes(buf: &[u8]) -> Self{
+        Self{
+            first_child_ID: u64::from_le_bytes(buf[0..8].try_into().unwrap()),
+        }
+    }
+
+    pub fn to_le_bytes(&self) -> Vec<u8>{
+        let mut buf:Vec<u8> = Vec::new();
+        buf.extend(self.first_child_ID.to_le_bytes());
+        buf
+    }
+
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -132,10 +164,41 @@ pub struct FileType{
     pub size: u64,
     pub file_address: u64,
 }
+impl FileType{
+    pub fn from_bytes(buf: &[u8]) -> Self{
+        Self{
+            bit_flag: u64::from_le_bytes(buf[0..8].try_into().unwrap()),
+            size: u64::from_le_bytes(buf[9..16].try_into().unwrap()),
+            file_address: u64::from_le_bytes(buf[17..25].try_into().unwrap()),
+        }
+    }
+
+    pub fn to_le_bytes(&self) -> Vec<u8>{
+        let mut buf:Vec<u8> = Vec::new();
+        buf.extend(self.bit_flag.to_le_bytes());
+        buf.extend(self.size.to_le_bytes());
+        buf.extend(self.file_address.to_le_bytes());
+        buf
+    }
+
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct SymbolicType{
     pub target_ID: u64,
+}
+impl SymbolicType{
+    pub fn from_bytes(buf: &[u8]) -> Self{
+        Self{
+            target_ID: u64::from_le_bytes(buf[0..8].try_into().unwrap()),
+        }
+    }
+
+    pub fn to_le_bytes(&self) -> Vec<u8>{
+        let mut buf:Vec<u8> = Vec::new();
+        buf.extend(self.target_ID.to_le_bytes());
+        buf
+    }
 }
 
 //ここは改善予定
@@ -145,6 +208,23 @@ pub struct DivisionType{
     pub block_address: u64,
     pub sector_address: u64,
 }
+impl DivisionType{
+    pub fn from_bytes(buf: &[u8]) -> Self{
+        Self{
+            bit_flag: u64::from_le_bytes(buf[0..8].try_into().unwrap()),
+            block_address: u64::from_le_bytes(buf[9..16].try_into().unwrap()),
+            sector_address: u64::from_le_bytes(buf[17..25].try_into().unwrap()),
+        }
+    }
+
+    pub fn to_le_bytes(&self) -> Vec<u8>{
+        let mut buf:Vec<u8> = Vec::new();
+        buf.extend(self.bit_flag.to_le_bytes());
+        buf.extend(self.block_address.to_le_bytes());
+        buf.extend(self.sector_address.to_le_bytes());
+        buf
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum EntryType{
@@ -153,6 +233,50 @@ pub enum EntryType{
     File(FileType),
     SymbolicType(SymbolicType),
     Division(DivisionType),
+}
+impl EntryType{
+    pub fn from_bytes(buf: &[u8], entry_type: EntryStructType) -> Self{
+        match entry_type {
+            EntryStructType::directory => {
+                Self::Directory(DirectoryType::from_bytes(buf))
+            }
+            EntryStructType::file => {
+                Self::File(FileType::from_bytes(buf))
+            }
+            EntryStructType::symbolic => {
+                Self::SymbolicType(SymbolicType::from_bytes(buf))
+            }
+            EntryStructType::division => {
+                Self::Division(DivisionType::from_bytes(buf))
+            }
+    
+    
+        }
+    }
+
+    pub fn to_le_bytes(&self) -> Vec<u8>{
+        match self{
+            EntryType::Pad(data) => {
+                return data.to_le_bytes();
+            }
+            EntryType::Directory(data) => {
+                return data.to_le_bytes();
+            }
+            EntryType::File(data) => {
+                return data.to_le_bytes();
+            }
+            EntryType::SymbolicType(data) => {
+                return data.to_le_bytes();
+            }
+            EntryType::Division(data) => {
+                return data.to_le_bytes();
+            }
+        
+        
+        
+        }
+    }
+
 }
 
 #[derive(Debug)]
@@ -175,6 +299,10 @@ pub struct Entry{
     pub name: [u8; 256],
 }
 impl Entry{
+    // pub fn new() -> Self{
+
+    // }
+
     pub fn from_bytes(buf: &[u8]) -> Self{
         Self{
             data_type: EntryStructType::try_from(buf[0]).unwrap_or_default(),
@@ -189,8 +317,23 @@ impl Entry{
             name: buf[257..512].try_into().unwrap(),
         }
     }
+
+    pub fn to_le_bytes(&self) -> Vec<u8>{
+        let mut buf:Vec<u8> = Vec::new();
+        buf.extend([self.data_type as u8]);
+        buf.extend(self.ID.to_le_bytes());
+        buf.extend(self.parent_ID.to_le_bytes());
+        buf.extend(self.next_sibling_ID.to_le_bytes());
+        buf.extend(self.prev_sibling_ID.to_le_bytes());
+        buf.extend(self.putting);
+        buf.extend(self.mode.to_le_bytes());
+        buf.extend(self.last_updatated_time.to_le_bytes());
+        buf.extend([self.name_size]);
+        buf.extend(self.name);
+        buf
+    }
+
+
 }
-
-
 
 

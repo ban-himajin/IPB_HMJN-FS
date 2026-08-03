@@ -1,5 +1,8 @@
 use std::{result, error, fs, mem};
-mod IPB_HMJN_FS;
+
+use crate::IPB_HMJN_FS::FS_core_types::Entry;
+pub mod IPB_HMJN_FS;
+pub mod API;
 
 
 fn main() -> result::Result<(), Box<dyn error::Error>> {
@@ -12,15 +15,30 @@ fn main() -> result::Result<(), Box<dyn error::Error>> {
     println!("{:?}", super_block);
     IPB_HMJN_FS::FS_format::FS_format(&mut super_block, &mut output_file)?;
 
-    let execution = IPB_HMJN_FS::FS_execution::executions::Execution::new(super_block, &mut output_file)?;
 
-    let bit_flag_data = execution.bitmap.get_free_bit(11);
-    execution.bitmap.write_bit_flag(bit_flag_data)?;
+    let execution = IPB_HMJN_FS::FS_execution::executions::Execution::new(super_block, 10, &mut output_file)?;
+    println!("test1");
+    let bit_flag_data = execution.bitmap.borrow().get_free_bit(11);
+    execution.bitmap.borrow().write_bit_flag(bit_flag_data)?;
+    
+    println!("test2");
+    // IPB_HMJN_FS::FS_execution::FS_function_parts::tree_parts::type2::TreeData::<u64, u64>::scan_tree(&execution.super_block.borrow_mut(), 128, 0, 4, 512);
 
-    let new_ID = IPB_HMJN_FS::FS_execution::FS_function_parts::tree_parts::get_endpoint_ID(&execution.super_block, execution.super_block.directory_tree_cluster_num, execution.super_block.directory_tree_depth, &mut output_file)?;
-    println!("test1 {}", new_ID);
+    // IPB_HMJN_FS::FS_execution::FS_function_parts::tree_parts::type2::TreeData::<u64, u64>::scan_tree(&execution.super_block.borrow_mut(), 128, 0, 4, 512);
 
-    let test = IPB_HMJN_FS::FS_execution::FS_function_parts::tree_parts::search_entry_location(&execution.super_block, execution.super_block.directory_tree_cluster_num, execution.super_block.directory_tree_depth, 1, mem::size_of::<IPB_HMJN_FS::FS_core_types::Entry>() as u64, &mut output_file)?;
-    println!("test2 : {:?}", test);
+    // IPB_HMJN_FS::FS_execution::FS_function_parts::tree_parts::type2::TreeData::<(usize, u64), u64>::scan_tree(&execution.super_block.borrow_mut(), 128, 0, 4, 512);
+
+    let mut data = IPB_HMJN_FS::FS_execution::FS_function_parts::tree_parts::TreeData::<(usize, u64), u64>::new(10);
+    let address = execution.super_block.borrow().directory_tree_address;
+    let depth = execution.super_block.borrow().directory_tree_depth;
+    data.scan_tree(&execution.super_block.borrow_mut(), 0, address, depth, 512, &mut execution.bitmap.borrow_mut(), &mut output_file)?;
+
+    // let new_ID = IPB_HMJN_FS::FS_execution::FS_function_parts::tree_parts::type1::get_endpoint_address(&execution.super_block.borrow(), execution.super_block.borrow().directory_tree_address, execution.super_block.borrow().directory_tree_depth, mem::size_of::<Entry>() as u64, &mut output_file)?;
+    // println!("test1 {}", new_ID.tail_address);
+    // println!("test1 {}", new_ID.tail_ID);
+
+    // let test = IPB_HMJN_FS::FS_execution::FS_function_parts::tree_parts::type1::search_entry_location(&execution.super_block.borrow(), execution.super_block.borrow().directory_tree_address, execution.super_block.borrow().directory_tree_depth, 1, mem::size_of::<IPB_HMJN_FS::FS_core_types::Entry>() as u64, &mut output_file)?;
+    // println!("test2 : {:?}", test);
     Ok(())
 }
+

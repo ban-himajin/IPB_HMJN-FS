@@ -1,11 +1,13 @@
 use core::error;
 use std::{io, result, string::String, mem};
 use crate::IPB_HMJN_FS;
+use crate::IPB_HMJN_FS::FS_core_types::Entry;
 use crate::IPB_HMJN_FS::checksum_functions::CRC32;
 use crate::IPB_HMJN_FS::super_block_config;
+use crate::IPB_HMJN_FS::general_function::{round_up};
 
 use super::FS_core_types;
-use super::constant;
+use super::Constant;
 use super::error_handlind;
 
 #[derive(Debug)]
@@ -167,7 +169,7 @@ fn get_setup_data() -> result::Result<GetInputData, Box<dyn std::error::Error>>{
     })
 }
 
-pub fn making_checksum_data(super_block: &FS_core_types::SuperBlockData) -> [u8; 12]{
+pub fn making_checksum_data(super_block: &FS_core_types::SuperBlockData) -> [u8; 13]{
     let arr = [
         super_block.fs_version.top as u8,
         super_block.fs_version.mid as u8,
@@ -178,6 +180,7 @@ pub fn making_checksum_data(super_block: &FS_core_types::SuperBlockData) -> [u8;
         super_block.one_cluster_block_num as u8,
         super_block.partition_cluster_size as u8,
         super_block.bitmap_size as u8,
+        super_block.free_ID_bitmap_size as u8,
         super_block.back_up_num as u8,
         super_block.read_algorithm_num as u8,
         super_block.write_algorithm_num as u8,
@@ -207,27 +210,29 @@ fn setup_super_block(setupdata: GetInputData) -> FS_core_types::SuperBlockData{
     super_block.partition_cluster_size = setupdata.partition_cluseter_num;
     super_block.back_up_num = setupdata.back_up_nums;
 
-    super_block.bitmap_cluster_num = now_select_cluster;
+    super_block.bitmap_address = now_select_cluster;
+    super_block.bitmap_size = round_up(round_up(setupdata.partition_cluseter_num, u8::BITS as u64), setupdata.GetOneClusterBytes());
     now_select_cluster += 1;
-    {
-        let cluste_in_address_num = setupdata.GetOneClusterBytes() / mem::size_of::<u64>() as u64;
-        super_block.bitmap_size = (((setupdata.partition_cluseter_num + ((mem::size_of::<u64>() as u64) - 1)) / (mem::size_of::<u64>() as u64)) + cluste_in_address_num - 1) / cluste_in_address_num;
-    }
-    super_block.back_up_list_cluster_num = now_select_cluster + super_block.bitmap_size - 1;
+
+    super_block.back_up_list_address = now_select_cluster + super_block.bitmap_size - 1;
     now_select_cluster += super_block.bitmap_size;
 
-    super_block.directory_tree_cluster_num = now_select_cluster;
+    super_block.directory_tree_address = now_select_cluster;
     super_block.directory_tree_depth = 0;
     now_select_cluster += 1;
 
-    super_block.free_ID_tree_cluster_num = now_select_cluster;
-    super_block.free_ID_tree_depth = 0;
+    super_block.name_tree_address = now_select_cluster;
+    super_block.name_tree_depth = 0;
+    now_select_cluster += 1;
+
+    super_block.free_ID_bitmap_address = now_select_cluster;
+    super_block.free_ID_bitmap_size = round_up((setupdata.partition_cluseter_num * (setupdata.GetOneClusterBytes() / mem::size_of::<Entry>() as u64)) / 2 / mem::size_of::<u64>() as u64, setupdata.GetOneClusterBytes());
     now_select_cluster += 1;
 
     {
         let end_data_size: u64 = (mem::size_of::<u64>() as u64) * 3;
-        let beg_data_size: u64 = (mem::size_of::<IPB_HMJN_FS::FS_core_types::SuperBlockData>() - mem::size_of::<u64>() * 4) as u64;
-        super_block.reservation_space_size = setupdata.GetOneBlockBytes() - beg_data_size - end_data_size;
+        let beg_data_size: u64 = (mem::size_of::<IPB_HMJN_FS::FS_core_types::SuperBlockData>() as u64 - end_data_size - mem::size_of::<u64>() as u64);
+        super_block.reservation_space_size = setupdata.GetOneClusterBytes() - beg_data_size - end_data_size;
     }
 
     super_block.read_algorithm_num = 0;
