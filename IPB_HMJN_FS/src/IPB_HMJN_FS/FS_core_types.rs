@@ -12,9 +12,9 @@ pub struct Version{
 impl Default for Version{
     fn default() -> Self{
         Self {
-            top: constant::VERSION_TOP,
-            mid: constant::VERSION_MID,
-            low: constant::VERSION_LOW,
+            top: Constant::VERSION_TOP,
+            mid: Constant::VERSION_MID,
+            low: Constant::VERSION_LOW,
         }
     }
 }
@@ -48,28 +48,28 @@ pub struct SuperBlockData{
 impl Default for SuperBlockData{
     fn default() -> Self {
         Self{
-            magic_number: constant::MAGIC_NUMBER,
-            back_up_or_main: constant::BACK_UP_OR_MAIN,
+            magic_number: Constant::MAGIC_NUMBER,
+            back_up_or_main: Constant::BACK_UP_OR_MAIN,
             fs_version: Version::default(),
-            partition_LBA: constant::PARTIITON_LBA,
-            one_sector_size: constant::ONE_SECTOR_SIZE,
-            one_block_sector_num: constant::ONE_BLOCK_SECTOR_NUM,
-            one_cluster_block_num: constant::ONE_CLUSTER_BLOCK_NUM,
-            partition_cluster_size: constant::PARTITION_CLUSTER_SIZE,
-            bitmap_address: constant::BITMAP_ADDRESS,
-            bitmap_size: constant::BITMAP_SIZE,
-            back_up_num: constant::BACK_UP_NUM,
-            back_up_list_address: constant::BACK_UP_LIST_ADDRESS,
-            directory_tree_address: constant::DIRECTORY_TREE_ADDRESS,
-            directory_tree_depth: constant::DIRECTORY_TREE_DEPTH,
+            partition_LBA: Constant::PARTIITON_LBA,
+            one_sector_size: Constant::ONE_SECTOR_SIZE,
+            one_block_sector_num: Constant::ONE_BLOCK_SECTOR_NUM,
+            one_cluster_block_num: Constant::ONE_CLUSTER_BLOCK_NUM,
+            partition_cluster_size: Constant::PARTITION_CLUSTER_SIZE,
+            bitmap_address: Constant::BITMAP_ADDRESS,
+            bitmap_size: Constant::BITMAP_SIZE,
+            back_up_num: Constant::BACK_UP_NUM,
+            back_up_list_address: Constant::BACK_UP_LIST_ADDRESS,
+            directory_tree_address: Constant::DIRECTORY_TREE_ADDRESS,
+            directory_tree_depth: Constant::DIRECTORY_TREE_DEPTH,
             name_tree_address: NAME_TREE_ADDRESS,
             name_tree_depth: NAME_TREE_DEPTH,
-            free_ID_bitmap_address: constant::FREE_ID_BITMAP_ADDRESS,
-            free_ID_bitmap_size: constant::FREE_ID_BITMAP_SIZE,
-            reservation_space_size: constant::RESERVATION_SPACE_SIZE,
-            read_algorithm_num: constant::READ_ALGORITHM_NUM,
-            write_algorithm_num: constant::WRITE_ALGORITHM_NUM,
-            check_sum: constant::CHECK_SUM,
+            free_ID_bitmap_address: Constant::FREE_ID_BITMAP_ADDRESS,
+            free_ID_bitmap_size: Constant::FREE_ID_BITMAP_SIZE,
+            reservation_space_size: Constant::RESERVATION_SPACE_SIZE,
+            read_algorithm_num: Constant::READ_ALGORITHM_NUM,
+            write_algorithm_num: Constant::WRITE_ALGORITHM_NUM,
+            check_sum: Constant::CHECK_SUM,
         }
     }
 }
