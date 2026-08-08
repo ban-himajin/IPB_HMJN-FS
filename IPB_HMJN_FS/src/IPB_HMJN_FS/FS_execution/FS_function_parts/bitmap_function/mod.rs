@@ -13,13 +13,13 @@ impl Bitmap{
 
     pub fn get_bitmap(&self, super_block: &SuperBlockData, output_file: &mut fs::File) -> result::Result<(), Box<dyn error::Error>>{
         Ok(
-            self.bitmap_data.get_bitmap(super_block, super_block.directory_tree_address, output_file)?
+            self.bitmap_data.get_bitmap(super_block, super_block.bitmap_address, output_file)?
         )
     }
 
     pub fn reload_bitmap(&self, super_block: &SuperBlockData, output_file: &mut fs::File) -> result::Result<(), Box<dyn error::Error>>{
         Ok(
-            self.bitmap_data.reload_bitmap(super_block, super_block.directory_tree_address, output_file)?
+            self.bitmap_data.reload_bitmap(super_block, super_block.bitmap_address, output_file)?
         )
     }
 
@@ -36,7 +36,7 @@ impl Bitmap{
     pub fn new(super_block: &SuperBlockData, output_file: &mut fs::File) -> result::Result<Self, Box<dyn error::Error>>{
         Ok(
             Self{
-                bitmap_data: FreeBitmap::new(super_block, super_block.directory_tree_address, output_file)?,
+                bitmap_data: FreeBitmap::new(super_block, super_block.bitmap_address, output_file)?,
             }
         )
     }

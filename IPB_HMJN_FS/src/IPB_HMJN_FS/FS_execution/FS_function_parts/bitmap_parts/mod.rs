@@ -130,12 +130,19 @@ impl FreeBitmap{
                 shift_bit = bit.trailing_ones();
                 let zero_bits = u8::BITS - shift_bit;
                 if zero_bits as u64 > write_bits {
-                    let write_flag = (1 << write_bits) - 1;
+                    let mut write_flag = (1 << write_bits) - 1;
+                    if shift_bit == 8 {
+                        shift_bit -= 1;
+                    }
                     *bit |= (write_flag as u8) << shift_bit;
+                    freedata.free_bits = bit.count_zeros();
                     break;
                 }
                 else{
-                    let write_flag = (1 << zero_bits) - 1;
+                    let mut write_flag = (1 << zero_bits) - 1;
+                    if shift_bit == 8{
+                        shift_bit -= 1;
+                    }
                     *bit |= (write_flag as u8) << shift_bit;
                 }
                 freedata.free_bits = bit.count_zeros();
@@ -160,7 +167,6 @@ impl FreeBitmap{
                 println!("error code : {}", err);
             }
         }
-
         Ok(())
     }
 
@@ -219,7 +225,11 @@ impl FreeBitmap{
                         }
                         else{
                             count = bit_data.trailing_zeros();
-                            bit_data >>= count;
+                            // if count == 8{
+                            //     count -= 1;
+                            // }
+                            // bit_data >>= count;
+                            bit_data = if count >= u8::BITS{ 0 } else { bit_data >> count};
                             shift_bit += count;
                             start_index = index as u64;
                             start_offset = shift_bit as u8;
@@ -237,7 +247,6 @@ impl FreeBitmap{
                 }
             }
         }
-
 
         FreeBits::fragmentation(free_bit_fragmentation)
     

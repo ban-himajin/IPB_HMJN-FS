@@ -8,7 +8,6 @@ use crate::IPB_HMJN_FS::general_function::{round_up};
 
 use super::FS_core_types;
 use super::Constant;
-use super::error_handlind;
 
 #[derive(Debug)]
 struct GetInputData{
@@ -251,4 +250,24 @@ pub fn setup_super_block_data() -> result::Result<FS_core_types::SuperBlockData,
     Ok(super_block)
 }
 
-
+#[cfg(feature = "debug")]
+pub fn debug_super_block(
+    partition_LBA: u64,
+    one_sector_size: u64,
+    one_block_sector_num: u64,
+    one_cluster_block_num: u64,
+    partition_cluseter_num: u64,
+    back_up_nums: u64,
+) -> FS_core_types::SuperBlockData
+{
+    setup_super_block(
+        GetInputData{
+            partition_LBA,
+            one_sector_size,
+            one_block_sector_num,
+            one_cluster_block_num,
+            partition_cluseter_num,
+            back_up_nums
+        }
+    )
+}
