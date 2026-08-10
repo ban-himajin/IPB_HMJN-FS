@@ -36,7 +36,7 @@ impl<'a> Execution{
     }
 }
 impl<'a> Create<'a, Option<(u64, u64)>> for Execution{
-    fn create(&self, path: &'a str, entry: Entry, output_file: &mut File)
+    fn create(&self, path: &'a str, mut entry: Entry, output_file: &mut File)
     -> Result<Option<(u64, u64)>, Box<dyn Error>> {
 
         let path_analysis = general_function::str_analysis(path, "/");
@@ -63,6 +63,7 @@ impl<'a> Create<'a, Option<(u64, u64)>> for Execution{
         let mut leaf_address = 0;
         
         if entry.name == general_function::to_fixed_array(entry_name.as_bytes()){
+            entry.ID = entry_ID.unwrap();
             let result_data = self.directory_tree.borrow().put_entry(&mut self.super_block.borrow_mut(), entry_ID.unwrap(), entry, &mut self.bitmap.borrow_mut(), output_file)?;
             leaf_address = result_data.leaf_address;
             if self.super_block.borrow().directory_tree_address != result_data.root_address
@@ -74,7 +75,6 @@ impl<'a> Create<'a, Option<(u64, u64)>> for Execution{
                 self.super_block.borrow().write_super_block_data(output_file)?;
             }
             self.free_ID_bitmap.borrow().write_bit_flag(free_ID)?;
-            println!("entry ID : {:?}", entry_ID);
             println!("書き込みに成功しました");
         }
         else{

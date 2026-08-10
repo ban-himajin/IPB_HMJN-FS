@@ -17,21 +17,6 @@ impl<Key: Default + From<(usize, u64)> + Eq + Hash + Clone,
         }
     }
 
-    // pub fn new_parent(&self, super_block: &mut SuperBlockData, bitmap: &mut Bitmap, output_file: &mut File) -> Result<bool, Box<dyn Error>>{
-    //     let new_parent_data= TreeData::<Key, Value>::new_parent(super_block, super_block.directory_tree_address, bitmap, output_file)?;
-    //     if let Some(new_paret) = new_parent_data{
-    //         super_block.directory_tree_address = new_paret;
-    //         super_block.directory_tree_depth += 1;
-    //         Ok(true)
-    //     }
-    //     else {
-    //         Ok(false)
-    //     }
-    // }
-    // pub fn new_child(super_block: &SuperBlockData, parent_address: u64, child_offset: u64, bitmap: &mut Bitmap, output_file: &mut fs::File) -> Result<Option<u64>, Box<dyn error::Error>>{
-    //     TreeData::<Key, Value>::new_child(super_block, super_block.directory_tree_address, bitmap, output_file)?;
-    // }
-
     //葉の一歩手前まで行く
     // fn scan_tree(&self, super_block: &mut SuperBlockData, search_ID: u64, bitmap: &mut Bitmap, output_file: &mut File)
     fn scan_tree(&self, super_block: &mut SuperBlockData, search_ID: u64, bitmap: &mut Bitmap, output_file: &mut File)
@@ -68,54 +53,15 @@ impl<Key: Default + From<(usize, u64)> + Eq + Hash + Clone,
 
         let result_data = self.scan_tree(super_block, search_ID, bitmap, output_file)?;
 
-
-        // /*
-        //     scan_treeで求めるのは葉前のクラスタであり葉の位置ではない
-        //     なので受け取ったクラスタ位置へシークし
-        //     エントリを書き込む領域を確保し書き込む必要がある
-        // */
-
         let one_cluster_entrys = super_block.get_one_cluster_bytes() / mem::size_of::<Entry>() as u64;
         let offset = search_ID % one_cluster_entrys;
         output_file.seek(SeekFrom::Start(super_block.get_one_cluster_bytes() * result_data.leaf_address + mem::size_of::<Entry>() as u64 * offset))?;
         output_file.write_all(&entry_data.to_le_bytes())?;
 
-        // let one_cluster_entrys = super_block.get_one_block_bytes() / mem::size_of::<Entry>() as u64;
-        // let leaf_inside_offset = search_ID % one_cluster_entrys;
-        // let leaf_prev_seek_num = super_block.get_one_cluster_bytes() * result_data.leaf_address + result_data.leaf_num * mem::size_of::<u64>() as u64;
-        // let mut buffer = [0u8; 8];
-        // output_file.seek(SeekFrom::Start(leaf_prev_seek_num))?;
-        // output_file.read_exact(&mut buffer)?;
-        // let mut leaf_address = u64::from_le_bytes(buffer);
-        // println!("buffer : {:?}", buffer);
-        // println!("leaf_address {:?}", result_data.leaf_address);
-        // println!("leaf_prev_seek_num {:?}", leaf_prev_seek_num);
-        // println!("leaf_address1 : {:?}", leaf_address);
-        // if leaf_address == 0{
-        //     let data = bitmap.get_free_bit(1);
-        //     let new_leaf_address = match data.cast_address(){
-        //         CastAddressData::defrag(def) => {
-        //             Some(def)
-        //         }
-        //         _ =>{
-        //             None
-        //         }
-        //     }.unwrap();
-        //     output_file.seek(SeekFrom::Start(leaf_prev_seek_num))?;
-        //     output_file.write_all(&new_leaf_address.to_le_bytes())?;
-        //     leaf_address = new_leaf_address;
-        //     println!("leaf_address2 : {:?}", leaf_address);
-        // }
-        // println!("leaf_address : {:?}", leaf_address);
-        // println!("leaf_address : {:?}", result_data.leaf_address);
-        // println!("leaf_inside_offset : {:?}", leaf_inside_offset);
-        // let leaf_seek = super_block.get_one_cluster_bytes() * leaf_address + mem::size_of::<Entry>() as u64 * leaf_inside_offset;
-        // output_file.seek(SeekFrom::Start(leaf_seek))?;
-        // output_file.write_all(&entry_data.to_le_bytes())?;
-        // println!("書き込み位置 : {}", leaf_seek);
-
         Ok(result_data)
     }
+
+    
 
 }
 

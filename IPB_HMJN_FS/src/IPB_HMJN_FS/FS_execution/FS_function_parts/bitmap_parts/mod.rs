@@ -17,7 +17,7 @@ impl Default for ResultFreeBitData{
     }
 }
 impl ResultFreeBitData{
-    fn cast_address_data(&self) -> u64{
+    pub fn cast_address_data(&self) -> u64{
         self.index * u8::BITS as u64 + self.offset as u64
     }
 }

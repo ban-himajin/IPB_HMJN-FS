@@ -8,6 +8,7 @@ use std::fs;
 use std::result;
 use std::error;
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::mem;
 
 //supere block types
 #[derive(Debug, Clone, Copy)]
@@ -132,30 +133,30 @@ pub enum CheckSumTypes {
 }
 
 //entry type
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(u8)]
 pub enum EntryStructType{
-    directory = 0,
-    file = 1,
-    symbolic = 2,
-    division = 3,
+    Directory = 0,
+    File = 1,
+    Symbolic = 2,
+    Division = 3,
 }
 impl TryFrom<u8> for EntryStructType{
     type Error = ();
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            1 => Ok(Self::directory),
-            2 => Ok(Self::file),
-            3 => Ok(Self::symbolic),
-            4 => Ok(Self::division),
+            0 => Ok(Self::Directory),
+            1 => Ok(Self::File),
+            2 => Ok(Self::Symbolic),
+            3 => Ok(Self::Division),
             _ => Err(())
         }
     }
 }
 impl Default for EntryStructType{
     fn default() -> Self {
-        EntryStructType::directory
+        EntryStructType::Directory
     }
 }
 
@@ -224,8 +225,8 @@ impl FileType{
     pub fn from_bytes(buf: &[u8]) -> Self{
         Self{
             bit_flag: u64::from_le_bytes(buf[0..8].try_into().unwrap()),
-            size: u64::from_le_bytes(buf[9..16].try_into().unwrap()),
-            file_address: u64::from_le_bytes(buf[17..25].try_into().unwrap()),
+            size: u64::from_le_bytes(buf[8..16].try_into().unwrap()),
+            file_address: u64::from_le_bytes(buf[16..24].try_into().unwrap()),
         }
     }
 
@@ -301,16 +302,16 @@ pub enum EntryType{
 impl EntryType{
     pub fn from_bytes(buf: &[u8], entry_type: EntryStructType) -> Self{
         match entry_type {
-            EntryStructType::directory => {
+            EntryStructType::Directory => {
                 Self::Directory(DirectoryType::from_bytes(buf))
             }
-            EntryStructType::file => {
+            EntryStructType::File => {
                 Self::File(FileType::from_bytes(buf))
             }
-            EntryStructType::symbolic => {
+            EntryStructType::Symbolic => {
                 Self::SymbolicType(SymbolicType::from_bytes(buf))
             }
-            EntryStructType::division => {
+            EntryStructType::Division => {
                 Self::Division(DivisionType::from_bytes(buf))
             }
     
@@ -343,6 +344,8 @@ impl EntryType{
 
 }
 
+pub type Putting = [u8; 512-256-1*2-8*9];
+
 #[derive(Debug)]
 #[repr(C , packed(1))]
 pub struct Entry{
@@ -369,12 +372,12 @@ pub struct Entry{
     pub next_sibling_address: u64,
     pub prev_sibling_ID: u64,
     pub prev_sibling_address: u64,
+    pub mode: u64,
 
     // entry_type: EntryType,
     // pub putting: [u8; 256-1-8-8-25],
-    pub putting: [u8; 512-256-1*2-8*9],
+    pub putting: Putting,
 
-    pub mode: u64,
     pub last_updatated_time: u64,
     pub name_size: u8,
     // name: [u8; 255],
@@ -395,8 +398,8 @@ impl Entry{
             next_sibling_address: next_sibling_adderss,
             prev_sibling_ID: prev_sibling_ID,
             prev_sibling_address: prev_sibling_address,
-            putting: general_function::to_fixed_array(&entry_type.to_le_bytes().as_slice()),
             mode: mode,
+            putting: general_function::to_fixed_array(&entry_type.to_le_bytes().as_slice()),
             last_updatated_time: timestamp,
             name_size: name.len() as u8,
             name: general_function::to_fixed_array(name.as_bytes()),
@@ -414,11 +417,11 @@ impl Entry{
             next_sibling_address: u64::from_le_bytes(buf[33..41].try_into().unwrap()).try_into().unwrap_or_default(),
             prev_sibling_ID: u64::from_le_bytes(buf[41..49].try_into().unwrap()).try_into().unwrap_or_default(),
             prev_sibling_address: u64::from_le_bytes(buf[49..57].try_into().unwrap()).try_into().unwrap_or_default(),
-            putting: buf[57..239].try_into().unwrap(),
-            mode: u64::from_le_bytes(buf[239..247].try_into().unwrap()).try_into().unwrap_or_default(),
+            mode: u64::from_le_bytes(buf[57..65].try_into().unwrap()).try_into().unwrap_or_default(),
+            putting: buf[65..247].try_into().unwrap(),
             last_updatated_time: u64::from_le_bytes(buf[247..255].try_into().unwrap()).try_into().unwrap_or_default(),
             name_size: buf[256].try_into().unwrap(),
-            name: buf[257..512].try_into().unwrap(),
+            name: buf[256..512].try_into().unwrap(),
         }
     }
 
@@ -432,8 +435,8 @@ impl Entry{
         buf.extend(self.next_sibling_address.to_le_bytes());
         buf.extend(self.prev_sibling_ID.to_le_bytes());
         buf.extend(self.prev_sibling_address.to_le_bytes());
-        buf.extend(self.putting);
         buf.extend(self.mode.to_le_bytes());
+        buf.extend(self.putting);
         buf.extend(self.last_updatated_time.to_le_bytes());
         buf.extend([self.name_size]);
         buf.extend(self.name);

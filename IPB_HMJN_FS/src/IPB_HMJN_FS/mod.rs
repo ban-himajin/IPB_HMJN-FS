@@ -8,3 +8,5 @@ pub mod checksum_functions;
 pub mod general_function;
 
 pub mod FS_execution;
+
+pub mod command_console;

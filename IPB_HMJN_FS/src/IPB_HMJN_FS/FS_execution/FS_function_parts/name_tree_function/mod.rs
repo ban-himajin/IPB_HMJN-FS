@@ -158,9 +158,6 @@ impl<Key: Default + From<(usize, u64)> + Eq + Hash + Clone,
             if entry_buffer.entry == 0 && entry_buffer.entry_ID == 0 && entry_buffer.parent == 0{
                 output_file.seek(SeekFrom::Start(super_block.get_one_cluster_bytes() * result_data.leaf_address + i * entry_size))?;
                 output_file.write_all(&entry.to_le_bytes())?;
-                println!("entry.to_le_bytes : {:?}", &entry.to_le_bytes());
-                println!("書き込み位置 : {:?}", super_block.get_one_cluster_bytes() * result_data.leaf_address + i * entry_size);
-                println!("leaf address : {:?}", result_data.leaf_address);
                 write_check = true;
                 break;
             }

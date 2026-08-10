@@ -26,7 +26,7 @@ pub trait Close{
 }
 pub trait StreamWrite{
 
-    fn write(&self, buf: &[u8], output_file: &mut File) -> Result<(), Box<dyn Error>>;
+    fn write(&self, data: &[u8], output_file: &mut File) -> Result<(), Box<dyn Error>>;
 
 }
 pub trait StreamRead{

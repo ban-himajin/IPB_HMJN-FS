@@ -5,3 +5,6 @@ pub mod directory_tree_function;
 pub mod free_ID_bitmap_function;
 pub mod cash_parts;
 pub mod name_tree_function;
+
+pub mod write_actual_situation_parts;
+pub mod read_actual_situation_parts;
