@@ -1,0 +1,65 @@
+get_cache stert---------------
+key : (5, 41943040)
+self1 : LfuCache { nodes: [
+        LfuNode { key: (5, 41943040), value: 8, freq: 1, prev: Some(1), next: None }, 
+        LfuNode { key: (5, 16777216), value: 8, freq: 0, prev: None, next: Some(0) }
+    ], 
+    nodemap: {(5, 16777216): 1, (5, 41943040): 0}, 
+    freqmap: {0: (1, 0)}, 
+    min_freq: 0,
+    capacity: 10 
+}
+self2 : LfuCache { nodes: [
+        LfuNode { key: (5, 41943040), value: 8, freq: 1, prev: Some(1), next: None }, 
+        LfuNode { key: (5, 16777216), value: 8, freq: 0, prev: None, next: None }
+    ], 
+    nodemap: {(5, 16777216): 1, (5, 41943040): 0}, 
+    freqmap: {0: (1, 0)}, 
+    min_freq: 0, 
+    capacity: 10 
+}
+self3 : LfuCache { nodes: [
+        LfuNode { key: (5, 41943040), value: 8, freq: 1, prev: None, next: None }, 
+        LfuNode { key: (5, 16777216), value: 8, freq: 0, prev: None, next: None }
+    ], 
+    nodemap: {(5, 16777216): 1, (5, 41943040): 0}, 
+    freqmap: {1: (0, 0), 0: (1, 1)}, 
+    min_freq: 0, 
+    capacity: 10 
+}
+get_cache end---------------
+
+
+get_cache stert---------------
+key : (5, 41943040)
+self1 : LfuCache { nodes: [
+        LfuNode { key: (5, 41943040), value: 8, freq: 2, prev: None, next: None }, 
+        LfuNode { key: (5, 16777216), value: 8, freq: 0, prev: Some(2), next: None }, 
+        LfuNode { key: (4, 2097152), value: 10, freq: 0, prev: None, next: Some(1) }
+    ], 
+    nodemap: {(4, 2097152): 2, (5, 16777216): 1, (5, 41943040): 0}, 
+    freqmap: {1: (0, 0), 0: (2, 1)}, 
+    min_freq: 0, 
+    capacity: 10 
+}
+self2 : LfuCache { nodes: [
+        LfuNode { key: (5, 41943040), value: 8, freq: 2, prev: None, next: None }, 
+        LfuNode { key: (5, 16777216), value: 8, freq: 0, prev: Some(2), next: None }, 
+        LfuNode { key: (4, 2097152), value: 10, freq: 0, prev: None, next: Some(1) }
+    ], 
+    nodemap: {(4, 2097152): 2, (5, 16777216): 1, (5, 41943040): 0}, 
+    freqmap: {1: (0, 0), 0: (2, 1)}, 
+    min_freq: 0, 
+    capacity: 10 
+}
+self3 : LfuCache { nodes: [
+        LfuNode { key: (5, 41943040), value: 8, freq: 2, prev: None, next: None }, 
+        LfuNode { key: (5, 16777216), value: 8, freq: 0, prev: Some(2), next: None }, 
+        LfuNode { key: (4, 2097152), value: 10, freq: 0, prev: None, next: Some(1) }
+    ], 
+    nodemap: {(4, 2097152): 2, (5, 16777216): 1, (5, 41943040): 0}, 
+    freqmap: {2: (0, 0), 0: (2, 1)}, 
+    min_freq: 0, 
+    capacity: 10 
+}
+get_cache end---------------
