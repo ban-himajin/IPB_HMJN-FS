@@ -1,0 +1,13 @@
+[package]
+name = "IPB_HMJN_FS"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+
+[features]
+default = ["debug", "jp"]
+debug = []
+jp = []
+no_cash = []
